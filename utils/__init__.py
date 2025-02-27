@@ -160,14 +160,11 @@ from .db_utils import (
 # -----------------------------------#
 #    Payroll Processing Utilities    #
 # -----------------------------------#
-from .taxRates_utils import (
+from .payroll import (
     calculate_tax,
     calculate_period_amounts,
     calculate_ytd_amounts,
-    get_user_ytd_amounts
-)
-
-from .accrualRates_utils import (
+    get_user_ytd_amounts,
     calculate_service_period,
     calculate_leave_accrual,
     get_leave_summary,
@@ -208,7 +205,8 @@ from .error_utils import (
 # -------------------------#
 #    Logging Utilities     #
 # -------------------------#    
-from .logging_utils import (
+from .logging import (
+    AuditLogger,
     CustomJSONFormatter,
     setup_logging,
     log_event,
@@ -356,9 +354,6 @@ from .misc_utils import (
     get_current_timestamp
 )
 
-# Audit Logger
-from .audit_logger import AuditLogger
-
 __all__ = [
     # Authentication
     'validate_payroll_id',
@@ -497,6 +492,7 @@ __all__ = [
     'api_route_with_error_handling',
     
     # Logging
+    'AuditLogger',
     'CustomJSONFormatter',
     'setup_logging',
     'log_event',
@@ -504,7 +500,6 @@ __all__ = [
     'log_security_event',
     'cleanup_logs',
     'get_log_stats',
-    'AuditLogger',
     
     # Request Processing
     'get_request_data',
