@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 
 from utils.auth.session_utils import SessionManager
-from utils.audit_logger import AuditLogger
+from utils.logging import AuditLogger 
 
 logger = logging.getLogger(__name__)
 
