@@ -1,47 +1,68 @@
 #!/bin/bash
-# build.sh - Build script for Render deployment of a Python-Flask app with Tailwind CSS
+# build.sh - Production-ready build script for Render deployment
 
-# Exit immediately if any command fails.
-set -e
+# Exit immediately on any error and show each command
+set -ex
 
-echo "Starting build process for Render deployment..."
+echo "Starting production build process..."
 
-# 1. Install Python dependencies.
+# 1. Install Node.js using NVM (LTS version)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] || curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+nvm install --lts
+nvm use --lts
+
+# 2. Install Python dependencies with pip
 echo "Installing Python dependencies..."
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements.txt --no-cache-dir
 
-# 2. Install Node dependencies.
-# If a package.json exists, use it; otherwise, install Tailwind CSS globally.
+# 3. Node.js dependency management
 if [ -f package.json ]; then
-  echo "Found package.json. Installing Node dependencies..."
-  npm install
+  echo "Installing Node dependencies from package.json..."
+  npm install --production
 else
-  echo "No package.json found. Installing Tailwind CSS globally..."
-  npm install -g tailwindcss
+  echo "Initializing Node project with Tailwind CSS..."
+  npm init -y
+  npm install tailwindcss postcss autoprefixer --save-prod
+  npx tailwindcss init -p
 fi
 
-# 3. Build Tailwind CSS assets.
-# Input: styles.css, Output: output.css (adjust paths as needed).
-echo "Compiling Tailwind CSS..."
+# 4. Ensure Tailwind configuration exists
+if [ ! -f tailwind.config.js ]; then
+  echo "Generating Tailwind config..."
+  cat <<EOF > tailwind.config.js
+module.exports = {
+  content: [
+    "./templates/**/*.html",
+    "./static/src/**/*.js",
+    "./app.py",
+    "./routes/**/*.py"
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+EOF
+fi
+
+# 5. Build Tailwind CSS assets
+echo "Compiling production Tailwind CSS..."
 npx tailwindcss -i ./static/css/style.css -o ./static/css/output.css --minify
 
-# 4. Optional: Run database migrations if using a migration tool (e.g., Flask-Migrate).
-# Uncomment the lines below if applicable.
-#
-# echo "Running database migrations..."
-# flask db upgrade
+# 6. Validate critical assets
+required_files=(
+  "app.py"
+  "requirements.txt"
+  "static/css/output.css"
+)
+for file in "${required_files[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "ERROR: Missing critical file: $file"
+    exit 1
+  fi
+done
 
-# 5. Log environment variables (optional, for debugging purposes).
-echo "Using the following environment variables:"
-echo "GOOGLE_API_KEY: ${GOOGLE_API_KEY:-not set}"
-echo "GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-not set}"
-echo "GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-not set}"
-echo "GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-not set}"
-echo "GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-not set}"
-echo "JWT_SECRET_KEY: ${JWT_SECRET_KEY:-not set}"
-echo "MONGO_DBNAME: ${MONGO_DBNAME:-not set}"
-echo "MONGO_URI: ${MONGO_URI:-not set}"
-echo "SECRET_KEY: ${SECRET_KEY:-not set}"
-
-echo "Build process completed successfully."
+echo "Production build completed successfully."
