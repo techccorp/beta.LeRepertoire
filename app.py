@@ -186,7 +186,8 @@ from utils import (
     delete_session,
     refresh_session,
     validate_session,
-    get_user _from_session,
+  # Corrected line
+    get_user_from_session,
     set_user_in_session,
     
     # User Management
