@@ -143,8 +143,9 @@
                                            pattern="^D[KBROFPSGW]-\d{6}$"
                                            class="input-field w-full px-4 py-3 rounded text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-600"
                                            required
-                                           autocomplete="username">
-                                    <i class="fas fa-check valid-icon hidden"></i>
+                                           autocomplete="username"
+                                           aria-label="Payroll ID">
+                                    <i class="fas fa-check valid-icon hidden" aria-hidden="true"></i>
                                 </div>
                                 
                                 <div class="input-wrapper">
@@ -155,15 +156,16 @@
                                            class="input-field w-full px-4 py-3 rounded text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-600"
                                            required
                                            minlength="8"
-                                           autocomplete="current-password">
-                                    <i class="fas fa-check valid-icon hidden"></i>
+                                           autocomplete="current-password"
+                                           aria-label="Password">
+                                    <i class="fas fa-check valid-icon hidden" aria-hidden="true"></i>
                                 </div>
                             </div>
                             
     <!----------------------------------------->
     <!--       Error Message Container       -->
     <!----------------------------------------->
-                            <div id="login-errors" class="{% if not get_flashed_messages() %}hidden{% endif %}">
+                            <div id="login-errors" class="{% if not get_flashed_messages() %}hidden{% endif %}" aria-live="assertive">
                                 <p class="text-red-500 text-sm text-center">
                                     {% for message in get_flashed_messages() %}
                                         {{ message }}
@@ -174,9 +176,67 @@
                             <button type="submit" 
                                     id="login-submit-btn"
                                     class="btn-hover-effect w-full py-3 bg-amber-600 text-white text-lg font-medium rounded 
-                                           hover:bg-amber-700 transition-all duration-300">
+                                           hover:bg-amber-700 transition-all duration-300"
+                                    aria-label="Login">
                                 Login
                             </button>
+                        </form>
+
+                        <!--------------------->
+                        <!--    MFA Form     -->
+                        <!--------------------->
+                        <form id="mfa-form" class="flex flex-col gap-4 mb-6 hidden" novalidate>
+                            <h2 class="text-white text-xl mb-2">Two-Factor Authentication</h2>
+                            <p class="text-white text-sm mb-4">Please enter the verification code from your authenticator app.</p>
+                            
+                            <div class="space-y-4">
+                                <div class="input-wrapper">
+                                    <input type="text" 
+                                           id="mfa-code" 
+                                           name="mfa_code" 
+                                           placeholder="Authentication Code (6 digits)"
+                                           class="input-field w-full px-4 py-3 rounded text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                           required
+                                           aria-label="Authentication Code"
+                                           inputmode="numeric"
+                                           pattern="\d{6}">
+                                    <i class="fas fa-check valid-icon hidden" aria-hidden="true"></i>
+                                </div>
+                                
+                                <div class="flex items-center">
+                                    <input type="checkbox" 
+                                           id="use-recovery-code" 
+                                           name="use_recovery_code" 
+                                           class="mr-2"
+                                           aria-label="Use recovery code instead">
+                                    <label for="use-recovery-code" class="text-white text-sm">Use recovery code instead</label>
+                                </div>
+                                
+                                <div id="recovery-code-help" class="text-white text-sm p-2 bg-gray-800 bg-opacity-50 rounded hidden">
+                                    <p>Recovery codes are in the format: ABCD-EFGH-IJKL-MNOP-QRST</p>
+                                    <p>Each code can only be used once.</p>
+                                </div>
+                            </div>
+                            
+                            <div id="mfa-errors" class="hidden" aria-live="assertive">
+                                <p class="text-red-500 text-sm text-center"></p>
+                            </div>
+                            
+                            <button type="submit" 
+                                    id="mfa-submit-btn"
+                                    class="btn-hover-effect w-full py-3 bg-amber-600 text-white text-lg font-medium rounded 
+                                           hover:bg-amber-700 transition-all duration-300"
+                                    aria-label="Verify Code">
+                                Verify Code
+                            </button>
+                            
+                            <div class="flex justify-between text-sm mt-2">
+                                <a href="#" id="back-to-login" class="text-white hover:underline">Back to Login</a>
+                                <span class="text-white">
+                                    <a href="#" id="recovery-code-link" class="hover:underline">Use recovery code</a>
+                                    <a href="#" id="normal-code-link" class="hover:underline hidden">Use authentication code</a>
+                                </span>
+                            </div>
                         </form>
                         
     <!----------------------------------------->
@@ -198,7 +258,8 @@
                                 id="google-signin-btn"
                                 onclick="handleGoogleSignIn()" 
                                 class="btn-hover-effect flex items-center justify-center gap-2 w-full py-3 bg-white 
-                                       text-gray-700 text-lg font-medium rounded hover:bg-gray-100 transition-all duration-300">
+                                       text-gray-700 text-lg font-medium rounded hover:bg-gray-100 transition-all duration-300"
+                                aria-label="Sign in with Google">
                             <img src="https://lh3.googleusercontent.com/C_Ty0alIJNrRQz5pNFmgA1rsRnhZDj67eVCCHXoJFFot0FQEZydARPRKbBADyHQoA0_Dj6gLITCshiJq6C-H-QM_U2mJwJZVLOQPnwvCL2RerGMEhw0" 
                                  alt="Google logo" 
                                  class="w-5 h-5">
