@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, Any, Callable, Union
 
 from utils.auth.auth_utils import extract_token_from_request, verify_token
-from utils.audit_logger import AuditLogger
+from utils.logging import AuditLogger 
 
 logger = logging.getLogger(__name__)
 
