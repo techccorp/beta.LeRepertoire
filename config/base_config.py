@@ -10,7 +10,7 @@ from datetime import timedelta
 load_dotenv()
 
 class Config:
-    """Base configuration class for MyLocalFoodie application."""
+    """Base configuration class for Le Repertoire application."""
     
     # MongoDB Configuration
     MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
@@ -97,30 +97,32 @@ class Config:
         'LOG_FORMAT',
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    #-------------------------------------#
-    #      Enhanced security settings     #
-    #-------------------------------------#
+    
+    # Error Logging
+    ERROR_LOGGING_ENABLED = os.getenv('ERROR_LOGGING_ENABLED', 'True').lower() == 'true'
+    
+    # Enhanced Security Settings
     SECURITY_CONFIG = {
-    'jwt': {
-        'access_token_lifetime': timedelta(minutes=15),
-        'refresh_token_lifetime': timedelta(days=7),
-        'algorithm': 'HS256',
-        'use_blacklist': True,
-        'blacklist_storage': 'redis',  # 'redis' or 'mongodb'
-    },
-    'csrf': {
-        'enabled': True,
-        'cookie_secure': True,
-        'cookie_httponly': True,
-        'cookie_samesite': 'Lax',
-    },
-    'rate_limiting': {
-        'enabled': True,
-        'login_limit': '5 per minute',
-        'api_limit': '60 per minute',
-        'storage': 'memory',  # 'memory', 'redis'
+        'jwt': {
+            'access_token_lifetime': timedelta(minutes=int(os.getenv('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', 15))),
+            'refresh_token_lifetime': timedelta(days=int(os.getenv('JWT_REFRESH_TOKEN_LIFETIME_DAYS', 7))),
+            'algorithm': os.getenv('JWT_ALGORITHM', 'HS256'),
+            'use_blacklist': os.getenv('JWT_USE_BLACKLIST', 'True').lower() == 'true',
+            'blacklist_storage': os.getenv('JWT_BLACKLIST_STORAGE', 'redis'),  # 'redis' or 'mongodb'
+        },
+        'csrf': {
+            'enabled': os.getenv('CSRF_ENABLED', 'True').lower() == 'true',
+            'cookie_secure': os.getenv('CSRF_COOKIE_SECURE', 'True').lower() == 'true',
+            'cookie_httponly': True,
+            'cookie_samesite': 'Lax',
+        },
+        'rate_limiting': {
+            'enabled': os.getenv('RATE_LIMITING_ENABLED', 'True').lower() == 'true',
+            'login_limit': os.getenv('RATE_LIMITING_LOGIN', '5 per minute'),
+            'api_limit': os.getenv('RATE_LIMITING_API', '60 per minute'),
+            'storage': os.getenv('RATE_LIMITING_STORAGE', 'memory'),  # 'memory', 'redis'
+        }
     }
-}
 
     def __init__(self):
         print("Loaded Configuration:")
@@ -135,5 +137,3 @@ class Config:
                     print(f"- {key}: Set")
                 else:
                     print(f"- {key}: {value}")
-
-
