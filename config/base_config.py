@@ -97,6 +97,30 @@ class Config:
         'LOG_FORMAT',
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
+    #-------------------------------------#
+    #      Enhanced security settings     #
+    #-------------------------------------#
+    SECURITY_CONFIG = {
+    'jwt': {
+        'access_token_lifetime': timedelta(minutes=15),
+        'refresh_token_lifetime': timedelta(days=7),
+        'algorithm': 'HS256',
+        'use_blacklist': True,
+        'blacklist_storage': 'redis',  # 'redis' or 'mongodb'
+    },
+    'csrf': {
+        'enabled': True,
+        'cookie_secure': True,
+        'cookie_httponly': True,
+        'cookie_samesite': 'Lax',
+    },
+    'rate_limiting': {
+        'enabled': True,
+        'login_limit': '5 per minute',
+        'api_limit': '60 per minute',
+        'storage': 'memory',  # 'memory', 'redis'
+    }
+}
 
     def __init__(self):
         print("Loaded Configuration:")
@@ -111,3 +135,5 @@ class Config:
                     print(f"- {key}: Set")
                 else:
                     print(f"- {key}: {value}")
+
+
