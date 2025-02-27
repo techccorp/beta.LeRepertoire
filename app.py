@@ -20,7 +20,7 @@ import gridfs
 import json
 
 # Import from utils package - maintaining original imports
-from utils import (
+from utils.auth import (
     # Authentication
     validate_payroll_id,
     hash_password,
@@ -186,7 +186,6 @@ from utils import (
     delete_session,
     refresh_session,
     validate_session,
-  # Corrected line
     get_user_from_session,
     set_user_in_session,
     
