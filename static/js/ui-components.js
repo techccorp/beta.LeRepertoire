@@ -11,6 +11,18 @@
  */
 
 /**
+ * Close a modal by ID
+ * Global function for use in modal HTML
+ * @param {string} modalId - The ID of the modal to close
+ */
+window.closeModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+/**
  * Loading Indicator Component
  * Creates and manages loading overlays for async operations
  */
@@ -857,16 +869,6 @@ class ErrorHandler {
         
         // Show modal
         modal.classList.remove('hidden');
-        
-        // Setup close function if not defined
-        if (typeof closeModal !== 'function') {
-            window.closeModal = function(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.add('hidden');
-                }
-            };
-        }
     }
 }
 
