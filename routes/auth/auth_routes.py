@@ -7,7 +7,7 @@ import jwt
 from datetime import datetime, timedelta
 import logging
 
-# Import additional utilities (preserved from original)
+# Import additional utilities
 from utils.validation_utils import validate_request_data
 from utils.security_utils import generate_random_string
 from utils.google_utils import validate_google_token, get_google_service
@@ -20,6 +20,9 @@ from utils.auth.auth_utils import validate_payroll_id, check_password
 
 # Import AuditLogger for audit events
 from utils.audit_logger import AuditLogger
+
+# Import the new TokenManager
+from utils.auth.token_manager import TokenManager
 
 logger = logging.getLogger(__name__)
 
@@ -40,45 +43,51 @@ class AuthError(Exception):
 
 def create_session_token(user):
     """
-    Create a JWT token containing essential user data.
-    Uses the updated user document structure:
-      - payroll_id: stored at top-level
-      - work_email: stored as 'work_email'
-      - role: stored at top-level
-      - business_id: stored as 'company_id'
-      - venue_id: stored at top-level
-      - work_area_id: stored at top-level
+    Create a JWT token containing essential user data using the TokenManager.
     """
     try:
-        payload = {
-            'payroll_id': user['payroll_id'],
-            'email_work': user['work_email'],
-            'role': user['role'],
-            'business_id': user['company_id'],
-            'venue_id': user['venue_id'],
-            'work_area_id': user['work_area_id'],
-            'exp': datetime.utcnow() + timedelta(hours=8),
-            'iat': datetime.utcnow()
-        }
-        return jwt.encode(
-            payload, 
-            current_app.config['SECRET_KEY'], 
-            algorithm='HS256'
-        )
+        if hasattr(current_app, 'token_manager'):
+            # Use the new TokenManager to generate tokens
+            return current_app.token_manager.generate_token(user)
+        else:
+            # Fall back to the old method if TokenManager isn't initialized
+            payload = {
+                'payroll_id': user['payroll_id'],
+                'email_work': user['work_email'],
+                'role': user['role'],
+                'business_id': user['company_id'],
+                'venue_id': user['venue_id'],
+                'work_area_id': user['work_area_id'],
+                'exp': datetime.utcnow() + timedelta(hours=8),
+                'iat': datetime.utcnow()
+            }
+            return jwt.encode(
+                payload, 
+                current_app.config['SECRET_KEY'], 
+                algorithm='HS256'
+            )
     except Exception as e:
         logger.error(f"Token creation failed: {str(e)}")
         raise AuthError("Failed to create authentication token")
 
 def verify_token(token):
     """
-    Verify and decode JWT token.
+    Verify and decode JWT token, checking for revocation.
     """
     try:
-        return jwt.decode(
-            token, 
-            current_app.config['SECRET_KEY'], 
-            algorithms=['HS256']
-        )
+        if hasattr(current_app, 'token_manager'):
+            # Use the new TokenManager to verify tokens
+            payload = current_app.token_manager.verify_token(token)
+            if not payload:
+                raise AuthError("Invalid or revoked token")
+            return payload
+        else:
+            # Fall back to the old method if TokenManager isn't initialized
+            return jwt.decode(
+                token, 
+                current_app.config['SECRET_KEY'], 
+                algorithms=['HS256']
+            )
     except jwt.ExpiredSignatureError:
         raise AuthError("Token has expired")
     except jwt.InvalidTokenError:
@@ -112,6 +121,7 @@ def login_required(f):
             
             g.user = payload
             g.current_user = user  # Store full user document for route handlers
+            g.token = token  # Store the token for potential revocation
             return f(*args, **kwargs)
             
         except AuthError as e:
@@ -132,24 +142,6 @@ def login_required(f):
 def login():
     """
     Handle user login with payroll ID and password.
-    
-    Expected JSON payload:
-      {
-         "payroll_id": "D{work_area_letter}-XXXXXX",
-         "password": "<plaintext_password>"
-      }
-    
-    Features:
-      - Validates required fields.
-      - Applies rate limiting to mitigate brute-force attacks.
-      - Validates the payroll ID format using the updated function.
-      - Retrieves the user from 'business_users' collection.
-      - Verifies the plaintext password against the stored hash.
-      - Clears rate limiting on successful login.
-      - Creates a JWT token containing essential user data.
-      - Updates the last login timestamp.
-      - Logs the successful login event.
-      - Returns the token and a subset of user data.
     """
     try:
         data = request.get_json()
@@ -262,11 +254,6 @@ def login():
 def verify_token_route():
     """
     Verify token validity and return user data.
-    
-    Expects the Authorization header in the format:
-       Bearer <token>
-       
-    On success, returns the user data extracted from the token and database.
     """
     try:
         auth_header = request.headers.get('Authorization')
@@ -314,10 +301,14 @@ def verify_token_route():
 @login_required
 def logout():
     """
-    Handle user logout with audit logging.
-    Requires a valid token via the login_required decorator.
+    Handle user logout with token revocation and audit logging.
     """
     try:
+        # Revoke the current token if TokenManager is available
+        if hasattr(current_app, 'token_manager') and hasattr(g, 'token'):
+            current_app.token_manager.revoke_token(token=g.token)
+            logger.info(f"Token revoked for user {g.user.get('payroll_id')}")
+
         # Log logout event using data stored in g.user and g.current_user
         AuditLogger.log_event(
             'user_logout',
@@ -339,6 +330,60 @@ def logout():
         return jsonify({
             "success": False,
             "message": "Logout failed"
+        }), 500
+
+# New endpoint for revoking all user tokens (for security incidents, password changes, etc.)
+@auth.route("/auth/revoke-all-tokens", methods=['POST'])
+@login_required
+def revoke_all_tokens():
+    """
+    Revoke all tokens for the current user.
+    Useful for security incidents, password changes, etc.
+    """
+    try:
+        # Check if TokenManager is available
+        if not hasattr(current_app, 'token_manager'):
+            return jsonify({
+                "success": False,
+                "message": "Token management not available"
+            }), 501
+
+        # Get current user's payroll ID
+        payroll_id = g.user.get('payroll_id')
+        if not payroll_id:
+            return jsonify({
+                "success": False,
+                "message": "User identification missing"
+            }), 400
+
+        # Revoke all tokens for the user
+        success = current_app.token_manager.revoke_user_tokens(payroll_id)
+        
+        if success:
+            # Log the event
+            AuditLogger.log_event(
+                'tokens_revoked',
+                payroll_id,
+                g.current_user.get('company_id', 'N/A'),
+                'All user tokens revoked',
+                ip_address=request.remote_addr
+            )
+            
+            return jsonify({
+                "success": True,
+                "message": "All tokens have been revoked"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "Failed to revoke all tokens"
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Token revocation error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "Token revocation failed"
         }), 500
 
 # Error handlers
