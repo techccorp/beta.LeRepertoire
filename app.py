@@ -373,8 +373,7 @@ try:
     app.session_manager = session_manager
     logger.info("Session Manager initialized successfully")
     
-    # Try to initialize the permission manager
-    ```python
+    # Try to initialize the permission manage
     try:
         # First try to find a permission manager initialization function
         # This flexible approach maintains compatibility
@@ -526,7 +525,6 @@ def favicon():
 
 @app.route('/image/<filename>', methods=['GET'])
 def get_image(filename):
-    ```python
     try:
         file = fs.find_one({'filename': filename})
         
