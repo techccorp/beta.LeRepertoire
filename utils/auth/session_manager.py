@@ -15,7 +15,7 @@ from werkzeug.local import LocalProxy
 from redis import Redis
 import time
 
-from utils.audit_logger import AuditLogger
+from utils.logging import AuditLogger 
 
 logger = logging.getLogger(__name__)
 
