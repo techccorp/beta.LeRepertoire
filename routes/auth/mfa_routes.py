@@ -4,6 +4,7 @@
 from flask import Blueprint, request, jsonify, current_app, g, session, send_file
 import io
 import logging
+import time  # Added missing import
 from bson.objectid import ObjectId
 
 # Import authentication decorator
