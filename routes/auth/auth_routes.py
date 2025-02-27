@@ -1,7 +1,7 @@
 # ------------------------------------------------------------
 #                   routes/auth/auth_routes.py
 # ------------------------------------------------------------
-from flask import Blueprint, request, jsonify, current_app, g, session
+from flask import Blueprint, request, jsonify, current_app, g, session, redirect, url_for
 from functools import wraps
 import jwt
 from datetime import datetime, timedelta
@@ -16,13 +16,11 @@ from utils.time_utils import generate_timestamp
 from utils.rate_limiter import RateLimiter
 
 # Import our updated authentication utilities
-from utils.auth.auth_utils import validate_payroll_id, check_password
+from utils.auth.auth_utils import validate_payroll_id, check_password, extract_token_from_request, verify_token
 
 # Import AuditLogger for audit events
 from utils.audit_logger import AuditLogger
-
-# Import the new TokenManager
-from utils.auth.token_manager import TokenManager
+from utils.error_utils import AuthenticationError, handle_error
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +33,69 @@ login_limiter = RateLimiter(
     block_seconds=900    # 15 minutes
 )
 
-class AuthError(Exception):
-    """Custom exception for authentication errors"""
-    def __init__(self, message, status_code=401):
-        self.message = message
-        self.status_code = status_code
+def login_required(f):
+    """
+    Decorator to protect routes requiring authentication.
+    Checks the Authorization header for a valid JWT token,
+    verifies that the user exists and is active, and populates
+    Flask's global 'g' with token payload and full user document.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            # First check if user is in session
+            if session.get('user') and session['user'].get('payroll_id'):
+                user_id = session['user'].get('payroll_id')
+                
+                # Verify user exists and is active
+                user = current_app.mongo.db.business_users.find_one({
+                    'payroll_id': user_id,
+                    'status': {'$ne': 'inactive'}
+                })
+                
+                if user:
+                    g.user = user
+                    return f(*args, **kwargs)
+            
+            # If no session, check for token in Authorization header
+            token = extract_token_from_request(request)
+            if token:
+                payload = verify_token(token)
+                if payload:
+                    # Verify user exists and is active
+                    user = current_app.mongo.db.business_users.find_one({
+                        'payroll_id': payload['payroll_id'],
+                        'status': {'$ne': 'inactive'}
+                    })
+                    
+                    if user:
+                        g.user = payload
+                        g.current_user = user  # Store full user document
+                        g.token = token  # Store the token for potential revocation
+                        return f(*args, **kwargs)
+            
+            # Handle API requests differently from browser requests
+            if request.is_json or request.headers.get('Accept') == 'application/json':
+                return jsonify({
+                    'success': False,
+                    'message': 'Authentication required'
+                }), 401
+            else:
+                return redirect(url_for('auth.login'))
+                
+        except AuthenticationError as e:
+            return jsonify({
+                "success": False,
+                "message": e.message
+            }), e.status_code
+        except Exception as e:
+            logger.error(f"Authentication error: {str(e)}")
+            return jsonify({
+                "success": False,
+                "message": "Authentication failed"
+            }), 401
+            
+    return decorated_function
 
 def create_session_token(user):
     """
@@ -68,77 +124,9 @@ def create_session_token(user):
             )
     except Exception as e:
         logger.error(f"Token creation failed: {str(e)}")
-        raise AuthError("Failed to create authentication token")
+        raise AuthenticationError("Failed to create authentication token")
 
-def verify_token(token):
-    """
-    Verify and decode JWT token, checking for revocation.
-    """
-    try:
-        if hasattr(current_app, 'token_manager'):
-            # Use the new TokenManager to verify tokens
-            payload = current_app.token_manager.verify_token(token)
-            if not payload:
-                raise AuthError("Invalid or revoked token")
-            return payload
-        else:
-            # Fall back to the old method if TokenManager isn't initialized
-            return jwt.decode(
-                token, 
-                current_app.config['SECRET_KEY'], 
-                algorithms=['HS256']
-            )
-    except jwt.ExpiredSignatureError:
-        raise AuthError("Token has expired")
-    except jwt.InvalidTokenError:
-        raise AuthError("Invalid token")
-
-def login_required(f):
-    """
-    Decorator to protect routes requiring authentication.
-    Checks the Authorization header for a valid JWT token,
-    verifies that the user exists and is active, and populates
-    Flask's global 'g' with token payload and full user document.
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        try:
-            auth_header = request.headers.get('Authorization')
-            if not auth_header:
-                raise AuthError("No authentication token provided")
-
-            token = auth_header.replace('Bearer ', '')
-            payload = verify_token(token)
-            
-            # Verify that the user exists and is active using updated fields
-            user = current_app.mongo.db.business_users.find_one({
-                "payroll_id": payload['payroll_id'],
-                "status": {"$ne": "inactive"}
-            })
-            
-            if not user:
-                raise AuthError("User account is no longer active")
-            
-            g.user = payload
-            g.current_user = user  # Store full user document for route handlers
-            g.token = token  # Store the token for potential revocation
-            return f(*args, **kwargs)
-            
-        except AuthError as e:
-            return jsonify({
-                "success": False,
-                "message": e.message
-            }), e.status_code
-        except Exception as e:
-            logger.error(f"Authentication error: {str(e)}")
-            return jsonify({
-                "success": False,
-                "message": "Authentication failed"
-            }), 401
-            
-    return decorated_function
-
-@auth.route("/auth/login", methods=['POST'])
+@auth.route("/login", methods=['POST'])
 def login():
     """
     Handle user login with payroll ID and password.
@@ -238,7 +226,7 @@ def login():
             "user": user_data
         })
 
-    except AuthError as e:
+    except AuthenticationError as e:
         return jsonify({
             "success": False,
             "message": e.message
@@ -250,7 +238,7 @@ def login():
             "message": "An unexpected error occurred"
         }), 500
 
-@auth.route("/auth/verify-token", methods=['POST'])
+@auth.route("/verify-token", methods=['POST'])
 def verify_token_route():
     """
     Verify token validity and return user data.
@@ -258,7 +246,7 @@ def verify_token_route():
     try:
         auth_header = request.headers.get('Authorization')
         if not auth_header:
-            raise AuthError("No token provided")
+            raise AuthenticationError("No token provided")
 
         token = auth_header.replace('Bearer ', '')
         payload = verify_token(token)
@@ -270,7 +258,7 @@ def verify_token_route():
         })
 
         if not user:
-            raise AuthError("User account is no longer active")
+            raise AuthenticationError("User account is no longer active")
 
         return jsonify({
             "success": True,
@@ -285,7 +273,7 @@ def verify_token_route():
             }
         })
 
-    except AuthError as e:
+    except AuthenticationError as e:
         return jsonify({
             "success": False,
             "message": e.message
@@ -297,7 +285,7 @@ def verify_token_route():
             "message": "Token verification failed"
         }), 401
 
-@auth.route("/auth/logout", methods=['POST'])
+@auth.route("/logout", methods=['POST'])
 @login_required
 def logout():
     """
@@ -332,8 +320,7 @@ def logout():
             "message": "Logout failed"
         }), 500
 
-# New endpoint for revoking all user tokens (for security incidents, password changes, etc.)
-@auth.route("/auth/revoke-all-tokens", methods=['POST'])
+@auth.route("/revoke-all-tokens", methods=['POST'])
 @login_required
 def revoke_all_tokens():
     """
@@ -387,7 +374,7 @@ def revoke_all_tokens():
         }), 500
 
 # Error handlers
-@auth.errorhandler(AuthError)
+@auth.errorhandler(AuthenticationError)
 def handle_auth_error(error):
     """Handle authentication errors."""
     return jsonify({
