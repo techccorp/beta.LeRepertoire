@@ -10,7 +10,7 @@ Provides centralized access to all utility functions and classes.
 #     Authentication Utilities           #
 # ---------------------------------------#
 # Import core auth utilities
-from .auth_utils import (
+from .auth.auth_utils import (
     hash_password,
     check_password,
     validate_payroll_id
@@ -157,9 +157,9 @@ from .db_utils import (
     execute_transaction
 )
 
-# ---------------------------------------#
-#        Payroll Processing Utilities    #
-# ---------------------------------------#
+# -----------------------------------#
+#    Payroll Processing Utilities    #
+# -----------------------------------#
 from .taxRates_utils import (
     calculate_tax,
     calculate_period_amounts,
@@ -184,9 +184,9 @@ from .database_utils import (
     get_workplace_config
 )
 
-# ---------------------------------------#
-#            Error Handling Utilities    #
-# ---------------------------------------#    
+# ------------------------------#
+#    Error Handling Utilities   #
+# ------------------------------#    
 from .error_utils import (
     AppError,
     ValidationError,
@@ -201,12 +201,13 @@ from .error_utils import (
     assert_found,
     assert_valid,
     assert_permitted,
-    get_error_context
+    get_error_context,
+    api_route_with_error_handling
 )
 
-# ---------------------------------------#
-#            Logging Utilities           #
-# ---------------------------------------#    
+# -------------------------#
+#    Logging Utilities     #
+# -------------------------#    
 from .logging_utils import (
     CustomJSONFormatter,
     setup_logging,
@@ -217,9 +218,9 @@ from .logging_utils import (
     get_log_stats
 )
 
-# ---------------------------------------#
-#        Request Processing Utilities    #
-# ---------------------------------------#    
+# ----------------------------------#
+#   Request Processing Utilities    #
+# ----------------------------------#    
 from .request_utils import (
     get_request_data,
     validate_request_data,
@@ -236,9 +237,9 @@ from .request_utils import (
     validate_request_size
 )
 
-# ---------------------------------------#
-#      Session Management Utilities      #
-# ---------------------------------------#    
+# -----------------------------------#
+#    Session Management Utilities    #
+# -----------------------------------#    
 from .session_utils import (
     create_session,
     get_session,
@@ -250,7 +251,7 @@ from .session_utils import (
 )
 
 # ---------------------------------------#
-#         User Management Utilities      #
+#       User Management Utilities        #
 # ---------------------------------------#    
 from .user_utils import (
     create_user,
@@ -493,6 +494,7 @@ __all__ = [
     'assert_valid',
     'assert_permitted',
     'get_error_context',
+    'api_route_with_error_handling',
     
     # Logging
     'CustomJSONFormatter',
