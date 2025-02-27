@@ -123,12 +123,43 @@ def setup_auth_components(app, redis_client=None):
     try:
         # Initialize session manager
         session_manager = init_session_manager(app, redis_client)
+        app.session_manager = session_manager
+        logger.info("Session manager initialized")
         
         # Initialize token manager
         token_manager = init_token_manager(app)
+        app.token_manager = token_manager
+        logger.info("Token manager initialized")
         
         # Initialize MFA manager
         mfa_manager = init_mfa_manager(app)
+        app.mfa_manager = mfa_manager
+        logger.info("MFA manager initialized")
+        
+        # Try to initialize the permission manager
+        try:
+            # First try modules approach
+            from modules.permissionsManager_module import init_permission_manager
+            permission_manager = init_permission_manager(app)
+            logger.info("Permission Manager initialized from modules package")
+        except (ImportError, AttributeError) as e:
+            logger.info(f"Permission Manager not available in modules package: {str(e)}")
+            
+            # Try alternate implementation
+            try:
+                from services.permission_service import init_permission_service
+                permission_manager = init_permission_service(app)
+                logger.info("Permission Manager initialized from services package")
+            except (ImportError, AttributeError) as e:
+                logger.info(f"Permission Manager not available in services package: {str(e)}")
+                permission_manager = None
+        
+        # Register permission manager if initialized
+        if permission_manager:
+            app.permission_manager = permission_manager
+            logger.info("Permission Manager registered with application")
+        else:
+            logger.warning("No Permission Manager available, permission checks will be disabled")
         
         logger.info("Authentication components initialized")
         
@@ -142,8 +173,14 @@ def setup_services(app, redis_client=None):
         # Initialize authentication service
         auth_service = init_auth_service(app)
         
-        # Initialize permission service
-        permission_service = init_permission_service(app, redis_client)
+        # Initialize permission service if not already initialized
+        if not hasattr(app, 'permission_manager'):
+            try:
+                permission_service = init_permission_service(app, redis_client)
+                app.permission_service = permission_service
+                logger.info("Permission service initialized")
+            except (ImportError, AttributeError) as e:
+                logger.warning(f"Permission service not available: {str(e)}")
         
         logger.info("Services initialized")
         
@@ -154,6 +191,10 @@ def setup_services(app, redis_client=None):
 def register_routes(app):
     """Register all application routes."""
     try:
+        # Import route registration functions
+        from routes import register_routes
+        register_routes(app)
+        
         # Register authentication routes
         register_auth_routes(app)
         
@@ -183,18 +224,33 @@ def setup_error_handlers(app):
     """Set up application error handlers."""
     try:
         # Import custom exceptions
-        from services.permission_service import PermissionError
+        from utils.error_utils import AppError, AuthenticationError, PermissionError, ValidationError, NotFoundError, DatabaseError, handle_error
         from utils.auth.session_manager import SessionExpiredError
         
         # Register error handlers
+        @app.errorhandler(AppError)
+        def handle_app_error(error):
+            return handle_error(error)
+        
+        @app.errorhandler(AuthenticationError)
+        def handle_authentication_error(error):
+            return handle_error(error)
+        
         @app.errorhandler(PermissionError)
         def handle_permission_error(error):
-            from flask import jsonify
-            return jsonify({
-                "success": False,
-                "message": error.message,
-                "code": error.code
-            }), error.status_code
+            return handle_error(error)
+        
+        @app.errorhandler(ValidationError)
+        def handle_validation_error(error):
+            return handle_error(error)
+        
+        @app.errorhandler(NotFoundError)
+        def handle_not_found_error(error):
+            return handle_error(error)
+        
+        @app.errorhandler(DatabaseError)
+        def handle_database_error(error):
+            return handle_error(error)
         
         @app.errorhandler(SessionExpiredError)
         def handle_session_expired(error):
