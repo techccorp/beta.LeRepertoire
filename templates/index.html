@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Le Repertoire - Your Recipe to Success. Professional kitchen management system.">
+    <title>Le Repertoire</title>
+      
+    <!----------------------------------------->
+    <!--      Enhanced Security Headers      -->
+    <!----------------------------------------->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; 
+          img-src 'self' https: data:; 
+          connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com;
+          script-src 'self' https://apis.google.com https://cdn.tailwindcss.com 'unsafe-inline' 'unsafe-eval';">
+    <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
+    
+    <!----------------------------------------->
+    <!--               Fonts                 -->
+    <!----------------------------------------->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300&display=swap" rel="stylesheet">
+    
+    <!----------------------------------------->
+    <!--            Tailwind CSS             -->
+    <!----------------------------------------->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!----------------------------------------->
+    <!--            Font Awesome             -->
+    <!----------------------------------------->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    
+    <!----------------------------------------->
+    <!--             CSRF Token              -->
+    <!----------------------------------------->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!----------------------------------------->
+    <!--           Google Sign-In            -->
+    <!----------------------------------------->
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <meta name="google-signin-client_id" content="{{ google_client_id }}">
+    
+    <!----------------------------------------->
+    <!--           Custom Styles             -->
+    <!----------------------------------------->
+    <style>
+        .auth-container {
+            backdrop-filter: blur(8px);
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            padding: 2rem;
+        }
+        
+        .input-field {
+            background-color: rgba(255, 255, 255, 0.9);
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            background-color: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+        }
+        
+        .btn-hover-effect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .valid-icon {
+            color: #10B981;
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        /* Added loading animation styles */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Added validation feedback styles */
+        .input-field.valid {
+            border-color: #10B981;
+        }
+
+        .input-field.invalid {
+            border-color: #EF4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <!---------------------->
+    <!--   Hero Section   -->
+    <!---------------------->
+    <div class="relative min-h-screen">
+        <div class="relative">
+            <img src="https://filedn.eu/lE855A3mjRAJf2IrQIzr3U0/img/home-bg.jpg" 
+                 alt="A beautiful kitchen" 
+                 class="w-full h-screen object-cover"
+                 aria-hidden="true">
+                 
+            <div class="absolute inset-0 bg-black bg-opacity-50 flex flex-col justify-center items-center 
+                        transition-opacity duration-500 opacity-100">
+                <div class="text-center">
+                    <h1 class="text-white text-9xl font-light mb-4" style="font-family: 'Cinzel', serif;">
+                        Le Repertoire
+                    </h1>
+                    <p class="text-white text-4xl mb-8 font-light" style="font-family: 'Oswald', sans-serif;">
+                        Your Recipe to Success
+                    </p>
+                    
+    <!----------------------------------------->
+    <!--      Authentication Container       -->
+    <!----------------------------------------->
+                    <div class="auth-container max-w-md mx-auto mb-8">
+                        <!--------------------->
+                        <!--   Login Form    -->
+                        <!--------------------->
+                        <form id="login-form" action="{{ url_for('auth.login') }}" method="POST" class="flex flex-col gap-4 mb-6" novalidate>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="space-y-4">
+                                <div class="input-wrapper">
+                                    <!------------------------------------------------------------------------->
+                                    <!-- Updated payroll ID field to match expected format e.g. DK-308020    -->
+                                    <!------------------------------------------------------------------------->
+                                    <input type="text" 
+                                           id="payroll-id" 
+                                           name="user_id" 
+                                           placeholder="Payroll ID (e.g., DK-308020)"
+                                           pattern="^D[KBROFPSGW]-\d{6}$"
+                                           class="input-field w-full px-4 py-3 rounded text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                           required
+                                           autocomplete="username">
+                                    <i class="fas fa-check valid-icon hidden"></i>
+                                </div>
+                                
+                                <div class="input-wrapper">
+                                    <input type="password" 
+                                           id="password" 
+                                           name="password" 
+                                           placeholder="Password"
+                                           class="input-field w-full px-4 py-3 rounded text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                           required
+                                           minlength="8"
+                                           autocomplete="current-password">
+                                    <i class="fas fa-check valid-icon hidden"></i>
+                                </div>
+                            </div>
+                            
+    <!----------------------------------------->
+    <!--       Error Message Container       -->
+    <!----------------------------------------->
+                            <div id="login-errors" class="{% if not get_flashed_messages() %}hidden{% endif %}">
+                                <p class="text-red-500 text-sm text-center">
+                                    {% for message in get_flashed_messages() %}
+                                        {{ message }}
+                                    {% endfor %}
+                                </p>
+                            </div>
+                            
+                            <button type="submit" 
+                                    id="login-submit-btn"
+                                    class="btn-hover-effect w-full py-3 bg-amber-600 text-white text-lg font-medium rounded 
+                                           hover:bg-amber-700 transition-all duration-300">
+                                Login
+                            </button>
+                        </form>
+                        
+    <!----------------------------------------->
+    <!--             Divider                 -->
+    <!----------------------------------------->
+                        <div class="relative my-6">
+                            <div class="absolute inset-0 flex items-center">
+                                <div class="w-full border-t border-gray-300"></div>
+                            </div>
+                            <div class="relative flex justify-center text-sm">
+                                <span class="px-2 text-white bg-transparent">Or continue with</span>
+                            </div>
+                        </div>
+                        
+    <!----------------------------------------->
+    <!--       Google Sign-In Button         -->
+    <!----------------------------------------->
+                        <button type="button" 
+                                id="google-signin-btn"
+                                onclick="handleGoogleSignIn()" 
+                                class="btn-hover-effect flex items-center justify-center gap-2 w-full py-3 bg-white 
+                                       text-gray-700 text-lg font-medium rounded hover:bg-gray-100 transition-all duration-300">
+                            <img src="https://lh3.googleusercontent.com/C_Ty0alIJNrRQz5pNFmgA1rsRnhZDj67eVCCHXoJFFot0FQEZydARPRKbBADyHQoA0_Dj6gLITCshiJq6C-H-QM_U2mJwJZVLOQPnwvCL2RerGMEhw0" 
+                                 alt="Google logo" 
+                                 class="w-5 h-5">
+                            Sign in with Google
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!----------------------------------------->
+    <!--            Error Modal              -->
+    <!----------------------------------------->
+    <div id="error-modal" 
+         class="hidden fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50"
+         role="dialog"
+         aria-labelledby="error-title"
+         aria-modal="true">
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
+            <div class="flex justify-end">
+                <button onclick="closeModal('error-modal')" 
+                        class="text-gray-400 hover:text-gray-700"
+                        aria-label="Close error modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="text-center mb-6">
+                <h2 id="error-title" class="text-2xl font-bold text-gray-900">Error</h2>
+                <p id="error-message" class="text-sm text-gray-600 mt-1"></p>
+            </div>
+        </div>
+    </div>
+
+    <!----------------------------------------->
+    <!--          Loading Overlay            -->
+    <!----------------------------------------->
+    <div id="loading-overlay" 
+         class="hidden fixed inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50"
+         role="alert"
+         aria-busy="true"
+         aria-label="Loading">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+    </div>
+
+    <!----------------------------------------->
+    <!--             Scripts                 -->
+    <!----------------------------------------->
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/google_auth.js') }}"></script>
+</body>
+</html>
