@@ -32,4 +32,16 @@ npx tailwindcss -i ./static/css/style.css -o ./static/css/output.css --minify
 # echo "Running database migrations..."
 # flask db upgrade
 
+# 5. Log environment variables (optional, for debugging purposes).
+echo "Using the following environment variables:"
+echo "GOOGLE_API_KEY: ${GOOGLE_API_KEY:-not set}"
+echo "GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-not set}"
+echo "GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-not set}"
+echo "GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID:-not set}"
+echo "GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-not set}"
+echo "JWT_SECRET_KEY: ${JWT_SECRET_KEY:-not set}"
+echo "MONGO_DBNAME: ${MONGO_DBNAME:-not set}"
+echo "MONGO_URI: ${MONGO_URI:-not set}"
+echo "SECRET_KEY: ${SECRET_KEY:-not set}"
+
 echo "Build process completed successfully."
