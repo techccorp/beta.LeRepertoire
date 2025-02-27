@@ -12,7 +12,8 @@ from .auth_utils import (
     hash_password,
     check_password,
     generate_token,
-    verify_token
+    verify_token,
+    extract_token_from_request
 )
 
 # Export for external use
@@ -24,5 +25,6 @@ __all__ = [
     'hash_password',
     'check_password',
     'generate_token',
-    'verify_token'
+    'verify_token',
+    'extract_token_from_request'
 ]
