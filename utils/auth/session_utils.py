@@ -1,11 +1,11 @@
 # ------------------------------------------------------------
-# utils/auth/session_utils.py
+# utils/auth/session_utils.py - Updated Import
 # ------------------------------------------------------------
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import logging
 from flask import session, current_app
-from utils.audit_logger import AuditLogger
+from utils.logging import AuditLogger  # New correct path
 
 logger = logging.getLogger(__name__)
 
