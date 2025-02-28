@@ -1,7 +1,7 @@
 # config/__init__.py
 """
 Central configuration exports for the application.
-Combines base configuration with payroll constants.
+Combines base configuration with payroll constants and database configuration.
 """
 
 # 1. Import Core Configuration
@@ -18,7 +18,27 @@ from .payroll_config import (
     PERIOD_DIVISORS
 )
 
-# 3. Explicit Exports
+# 3. Import MongoDB Configuration (if available)
+try:
+    from mongoDB_config import (
+        MONGO_URI,
+        MONGO_DBNAME,
+        MONGO_CONNECT_TIMEOUT,
+        MONGO_MAX_POOL_SIZE,
+        MONGO_SERVER_SELECTION_TIMEOUT,
+        COLLECTIONS,
+        get_db,
+        get_collection,
+        init_mongo,
+        close_connection
+    )
+    # Flag to indicate MongoDB configuration is available
+    MONGODB_CONFIG_AVAILABLE = True
+except ImportError:
+    # MongoDB configuration not available, set flag to False
+    MONGODB_CONFIG_AVAILABLE = False
+
+# 4. Explicit Exports
 __all__ = [
     # Core Configuration
     'Config',
@@ -30,10 +50,28 @@ __all__ = [
     'LEAVE_ENTITLEMENTS',
     'LEAVE_MAPPING',
     'TAX_BRACKETS',
-    'PERIOD_DIVISORS'
+    'PERIOD_DIVISORS',
+    
+    # MongoDB Configuration
+    'MONGODB_CONFIG_AVAILABLE'
 ]
 
-# 4. Validation Checks (Production Safety)
+# Add MongoDB exports if available
+if MONGODB_CONFIG_AVAILABLE:
+    __all__.extend([
+        'MONGO_URI',
+        'MONGO_DBNAME',
+        'MONGO_CONNECT_TIMEOUT',
+        'MONGO_MAX_POOL_SIZE',
+        'MONGO_SERVER_SELECTION_TIMEOUT',
+        'COLLECTIONS',
+        'get_db',
+        'get_collection',
+        'init_mongo',
+        'close_connection'
+    ])
+
+# 5. Validation Checks (Production Safety)
 try:
     # Verify critical configuration exists
     assert Config.MONGO_URI, "MongoDB URI must be configured"
