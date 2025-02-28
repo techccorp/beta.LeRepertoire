@@ -319,13 +319,13 @@ from .notification_utils import (
 # ---------------------------------------#
 #         API Integration Utilities      #
 # ---------------------------------------#    
-from .api_utils import (
-    call_external_api,
-    handle_api_response,
-    authenticate_api_request,
-    log_api_usage,
-    validate_api_key
-)
+# from .api_utils import (
+#    call_external_api,
+#    handle_api_response,
+#    authenticate_api_request,
+#    log_api_usage,
+#    validate_api_key
+# )
 
 # ---------------------------------------#
 #         Configuration Utilities        #
