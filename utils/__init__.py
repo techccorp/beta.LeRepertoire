@@ -274,14 +274,14 @@ from .notification_utils import (
 # ---------------------------------------#
 #         File Management Utilities      #
 # ---------------------------------------#    
-# from .file_utils import (
-#    upload_file,
-#    delete_file,
-#    get_file_url,
-#    validate_file_type,
-#    resize_image,
-#    generate_file_name
-#)
+ from .file_utils import (
+    upload_file,
+    delete_file,
+    get_file_url,
+    validate_file_type,
+    resize_image,
+    generate_file_name
+)
 
 # ---------------------------------------#
 #         Caching Utilities              #
