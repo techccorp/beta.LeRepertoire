@@ -120,9 +120,6 @@ def setup_authentication_indexes(db):
         logger.error(f"Error setting up authentication indexes: {str(e)}")
         raise
 
-# Rest of the file remains the same as the previous version
-# ...
-
 def setup_permission_indexes(db):
     """
     Set up indexes for permission-related collections.
