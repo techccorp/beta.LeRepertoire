@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Meta tags and title -->
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta name="description" content="Le Repertoire - Your recipe to success">
+  <meta name="author" content="Le Repertoire">
+  <title>{% block title %}Le Repertoire{% endblock %}</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome CDN for icons -->
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    rel="stylesheet"
+  >
+
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <!-- Custom JavaScript -->
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <script src="/static/js/domElements.js" defer></script>
+  <script src="/static/js/sidebar.js" defer></script>
+
+  <!-- CSRF Token Meta Tag -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <!-- Existing Styling (unchanged) -->
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+    .main-content {
+      transition: margin-left 0.3s ease;
+      display: flex;
+      flex-direction: row;
+      gap: 1.5rem;
+    }
+    .sidebar-open .main-content {
+      margin-left: 16rem; /* Sidebar width when open */
+    }
+    .sidebar-closed .main-content {
+      margin-left: 4rem; /* Collapsed sidebar width */
+    }
+
+    .left-panel,
+    .right-panel {
+      transition: flex-basis 0.3s ease;
+    }
+
+    /* ADJUSTED: smaller left panel (20%) for open state => bigger right panel (80%) */
+    .sidebar-open .left-panel {
+      flex-basis: 20%;
+    }
+    .sidebar-open .right-panel {
+      flex-basis: 80%;
+    }
+
+    /* Left panel is slightly larger (25%) when sidebar is closed => right panel 75% */
+    .sidebar-closed .left-panel {
+      flex-basis: 25%;
+    }
+    .sidebar-closed .right-panel {
+      flex-basis: 75%;
+    }
+
+    .panel {
+      padding: 1.5rem;
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Sidebar itself takes up the 4rem or 16rem margin; we rely on body classes to shift .main-content */
+    #sidebar {
+      width: 4rem;
+      transition: width 0.3s ease;
+    }
+    /* When .sidebar-open is active on body, we’ll expand it with JavaScript */
+    body.sidebar-open #sidebar {
+      width: 16rem;
+    }
+  </style>
+</head>
+
+<!-- Default to "sidebar-closed" so it’s narrow initially -->
+<body class="bg-gray-100 min-h-screen flex flex-col sidebar-closed">
+
+  <!-- Sidebar (positioned before main content in HTML) -->
+  <div id="sidebar">
+    {% include 'components/sidebar.html' %}
+  </div>
+
+  <!-- Flash Messages -->
+  <div class="flash-messages">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="p-4">
+          {% for category, message in messages %}
+            <div
+              class="alert {{ category }} bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+            >
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content flex-1 p-6">
+    <!-- Left Panel -->
+    <div class="left-panel panel">
+      {% block left_panel %}
+        <p>No content provided for the left panel.</p>
+      {% endblock %}
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel panel">
+      {% block right_panel %}
+        <p>No content provided for the right panel.</p>
+      {% endblock %}
+    </div>
+  </div>
+
+  <!-- Extra Scripts -->
+  {% block extra_scripts %}{% endblock %}
+
+  <!-- Vanilla JS: Hover-based opening -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const body = document.body;
+      const sidebar = document.getElementById('sidebar');
+      
+      // Start in "closed" state
+      body.classList.add('sidebar-closed');
+      body.classList.remove('sidebar-open');
+
+      // When user hovers over sidebar, open it
+      sidebar.addEventListener('mouseenter', () => {
+        body.classList.remove('sidebar-closed');
+        body.classList.add('sidebar-open');
+      });
+
+      // When user leaves sidebar area, close it
+      sidebar.addEventListener('mouseleave', () => {
+        body.classList.remove('sidebar-open');
+        body.classList.add('sidebar-closed');
+      });
+    });
+  </script>
+
+</body>
+</html>
