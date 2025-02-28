@@ -8,7 +8,7 @@ Combines base configuration with payroll constants.
 from .base_config import Config
 
 # 2. Import Payroll Constants
-from .patyroll_config import (
+from .payroll_config import (
     DEFAULT_PAYMENT_REFERENCE_PREFIX,
     SUPERANNUATION_RATE,
     STANDARD_HOURS,
