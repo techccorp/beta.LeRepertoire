@@ -1,0 +1,204 @@
+<div class="max-w-4xl mx-auto bg-white p-6 shadow-md">
+    <div class="flex justify-between mb-6">
+        <div>
+            <p>{{ payslip.employee_name }}</p>
+            <p>{{ payslip.street_address }}</p>
+            <p>{{ payslip.suburb }}</p>
+            <p>{{ payslip.state }} {{ payslip.postcode }}</p>
+        </div>
+        <div class="text-right">
+            <div class="p-2 mb-4">
+                <p class="font-bold">PAID BY</p>
+                <p>{{ payslip.company_name }}</p>
+                <p>ABN {{ payslip.abn }}</p>
+            </div>
+            <div class="p-2">
+                <p class="font-bold">EMPLOYMENT DETAILS</p>
+                <p>Pay Frequency: {{ payslip.pay_frequency|title }}</p>
+                <p>Annual Salary: ${{ "%.2f"|format(payslip.annual_salary) }}</p>
+                <p>Classification: {{ payslip.classification }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="flex justify-between bg-gray-200 p-2 mb-4">
+        <div>
+            <p>Pay Period: <span class="font-bold">{{ payslip.pay_period }}</span></p>
+        </div>
+        <div>
+            <p>Payment Date: <span class="font-bold">{{ payslip.payment_date }}</span></p>
+        </div>
+        <div>
+            <p>Total Earnings: <span class="font-bold">${{ "%.2f"|format(payslip.total_earnings) }}</span></p>
+        </div>
+        <div>
+            <p>Net Pay: <span class="font-bold">${{ "%.2f"|format(payslip.net_pay) }}</span></p>
+        </div>
+    </div>
+    <div class="mb-4">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="p-2 text-left">SALARY & WAGES</th>
+                    <th class="p-2 text-right">HOURS</th>
+                    <th class="p-2 text-right">BASE RATE</th>
+                    <th class="p-2 text-right">THIS PAY</th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right">YTD</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="p-2">Base Salary</td>
+                    <td class="p-2 text-right">{{ "%.4f"|format(payslip.hours_worked) }}</td>
+                    <td class="p-2 text-right">${{ "%.3f"|format(payslip.base_rate) }}</td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.base_pay) }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.ytd_earnings) }}</td>
+                </tr>
+                <tr>
+                    <td class="p-2">Other Previous Earnings</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.previous_earnings) }}</td>
+                </tr>
+                <tr class="bg-gray-200">
+                    <td class="p-2 font-bold">TOTAL</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.total_earnings) }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.ytd_total) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="mb-4">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="p-2 text-left">TAX</th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right">THIS PAY</th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right">YTD</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="p-2">PAYG Tax</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.tax_amount) }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.ytd_tax) }}</td>
+                </tr>
+                <tr class="bg-gray-200">
+                    <td class="p-2 font-bold">TOTAL</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.tax_amount) }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.ytd_tax) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="mb-4">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="p-2 text-left">SUPERANNUATION</th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right">THIS PAY</th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right">YTD</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="p-2">SGC - {{ payslip.super_fund }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.super_amount) }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.ytd_super) }}</td>
+                </tr>
+                <tr class="bg-gray-200">
+                    <td class="p-2 font-bold">TOTAL</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.super_amount) }}</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.ytd_super) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="mb-4">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="p-2 text-left">LEAVE</th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right"></th>
+                    <th class="p-2 text-right">ACCRUED</th>
+                    <th class="p-2 text-right">USED</th>
+                    <th class="p-2 text-right">BALANCE</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="p-2">Annual Leave in Hours</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.annual.accrued) }}</td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.annual.used) }}</td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.annual.balance) }}</td>
+                </tr>
+                <tr>
+                    <td class="p-2">Sick Leave in Hours</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.sick.accrued) }}</td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.sick.used) }}</td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.sick.balance) }}</td>
+                </tr>
+                <tr>
+                    <td class="p-2">Personal Leave in Hours</td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right"></td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.personal.accrued) }}</td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.personal.used) }}</td>
+                    <td class="p-2 text-right">{{ "%.3f"|format(payslip.leave_summary.personal.balance) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div>
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="p-2 text-left">PAYMENT DETAILS</th>
+                    <th class="p-2 text-left">REFERENCE</th>
+                    <th class="p-2 text-right">AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="p-2">{{ payslip.bank_account }}</td>
+                    <td class="p-2">{{ payslip.account_holder }}</td>
+                    <td class="p-2 text-right">${{ "%.2f"|format(payslip.net_pay) }}</td>
+                </tr>
+                <tr>
+                    <td class="p-2"></td>
+                    <td class="p-2">{{ payslip.payment_reference }}</td>
+                    <td class="p-2 text-right"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
