@@ -170,3 +170,76 @@ class SessionManager:
 class SessionExpiredError(Exception):
     """Custom exception for expired sessions."""
     pass
+
+# Add the missing standalone functions that are imported in __init__.py
+def create_session(user_data: Dict[str, Any], google_credentials: Optional[Dict] = None) -> None:
+    """
+    Create a new user session (standalone function wrapper for SessionManager).
+    
+    Args:
+        user_data: Dictionary containing user information
+        google_credentials: Optional dictionary with Google OAuth credentials
+    """
+    manager = SessionManager(current_app)
+    return manager.create_session(user_data, google_credentials)
+
+def get_session() -> Optional[Dict[str, Any]]:
+    """
+    Get the entire current session data.
+    
+    Returns:
+        Dictionary containing session data or None if no session exists
+    """
+    return session if session else None
+
+def delete_session() -> None:
+    """
+    Delete the current session.
+    """
+    manager = SessionManager(current_app)
+    return manager.end_session()
+
+def refresh_session() -> None:
+    """
+    Refresh the current session timestamp.
+    """
+    manager = SessionManager(current_app)
+    return manager.refresh_session()
+
+def validate_session() -> bool:
+    """
+    Validate that the current session is active and authenticated.
+    
+    Returns:
+        True if session is valid, False otherwise
+    """
+    if 'user' not in session:
+        return False
+    
+    # Check session age
+    try:
+        created_at = datetime.fromisoformat(session['created_at'])
+        if datetime.utcnow() - created_at > current_app.config['PERMANENT_SESSION_LIFETIME']:
+            return False
+        return True
+    except (ValueError, KeyError):
+        return False
+
+def get_user_from_session() -> Optional[Dict[str, Any]]:
+    """
+    Get user data from the current session.
+    
+    Returns:
+        Dictionary containing user data or None if no user in session
+    """
+    return session.get('user')
+
+def set_user_in_session(user_data: Dict[str, Any]) -> None:
+    """
+    Set user data in the current session.
+    
+    Args:
+        user_data: Dictionary containing user information
+    """
+    session['user'] = user_data
+    session['last_active'] = datetime.utcnow().isoformat()
