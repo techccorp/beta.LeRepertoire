@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class GoogleAPIError(Exception):
     """Custom exception for Google API errors"""
     pass
+
 #----------------------------------------------#
 #     API service definitions with versions    #
 #----------------------------------------------#
@@ -31,9 +32,20 @@ API_SERVICES = {
 }
 
 def validate_google_token(token: Dict) -> bool:
-    """Validates a Google token to ensure it's still valid."""
+    """
+    Validates a Google token to ensure it's still valid.
+    
+    Args:
+        token: Google OAuth credentials dictionary
+        
+    Returns:
+        bool: True if valid, False otherwise
+    """
     try:
+        # Create credentials object from token
         creds = credentials.Credentials(**token)
+        
+        # Test token validity by making a lightweight API call
         service = build('tasks', 'v1', credentials=creds)
         service.tasklists().list().execute()
         return True
@@ -45,7 +57,19 @@ def validate_google_token(token: Dict) -> bool:
         return False
 
 def get_google_service(service_key: str, credentials_dict: Dict) -> Any:
-    """Initialize a Google API service."""
+    """
+    Initialize a Google API service.
+    
+    Args:
+        service_key: Key identifying the service in API_SERVICES
+        credentials_dict: Dictionary containing OAuth credentials
+        
+    Returns:
+        Google API service instance
+        
+    Raises:
+        GoogleAPIError: If service initialization fails
+    """
     try:
         if service_key not in API_SERVICES:
             raise GoogleAPIError(f"Unknown service: {service_key}")
@@ -61,6 +85,7 @@ def get_google_service(service_key: str, credentials_dict: Dict) -> Any:
     except Exception as e:
         logger.error(f'Error initializing {service_key} service: {e}')
         raise GoogleAPIError(f"Failed to initialize {service_key} service")
+
 #----------------------------------------------#
 #                  Gmail                       #
 #----------------------------------------------#
@@ -126,6 +151,7 @@ class GmailService:
         message.attach(msg)
 
         return {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
+
 #----------------------------------------------#
 #              google_calendar                 #
 #----------------------------------------------#
@@ -178,6 +204,7 @@ class CalendarService:
         except Exception as e:
             logger.error(f"Error creating calendar event: {e}")
             raise GoogleAPIError("Failed to create calendar event")
+
 #----------------------------------------------#
 #                 google_tasks                 #
 #----------------------------------------------#
@@ -229,6 +256,7 @@ class TasksService:
         except Exception as e:
             logger.error(f"Error creating task: {e}")
             raise GoogleAPIError("Failed to create task")
+
 #----------------------------------------------#
 #                  google_keep                 #
 #----------------------------------------------#
@@ -297,20 +325,56 @@ class KeepService:
         except Exception as e:
             logger.error(f"Error deleting note: {e}")
             raise GoogleAPIError("Failed to delete note")
+
 #----------------------------------------------#
 #               token_services                 #
 #----------------------------------------------#
+def should_refresh_token(token_timestamp: datetime = None) -> bool:
+    """
+    Check if token should be refreshed based on timestamp
+    
+    Args:
+        token_timestamp: Timestamp when token was last refreshed
+        
+    Returns:
+        bool: True if token should be refreshed, False otherwise
+    """
+    if not token_timestamp:
+        return True
+    
+    # Token expires in 1 hour, refresh if less than 5 minutes remain
+    expiry_threshold = datetime.utcnow() - timedelta(minutes=55)
+    return token_timestamp < expiry_threshold
+
 def refresh_google_token(credentials_dict: Dict) -> Dict:
-    """Refresh Google OAuth token if expired"""
+    """
+    Refresh Google OAuth token if expired
+    
+    Args:
+        credentials_dict: Dictionary containing OAuth credentials
+        
+    Returns:
+        Dict: Updated credentials dictionary
+        
+    Raises:
+        GoogleAPIError: If token refresh fails
+    """
     try:
-        if not GoogleOAuthConfig.should_refresh_token(credentials_dict.get('token_timestamp')):
+        # Check if token needs refreshing
+        token_timestamp = credentials_dict.get('token_timestamp')
+        if token_timestamp and isinstance(token_timestamp, str):
+            token_timestamp = datetime.fromisoformat(token_timestamp.replace('Z', '+00:00'))
+        
+        if not should_refresh_token(token_timestamp):
             return credentials_dict
 
+        # Refresh the token
         creds = credentials.Credentials(**credentials_dict)
         request = google.auth.transport.requests.Request()
         
         creds.refresh(request)
         
+        # Return updated credentials
         return {
             'token': creds.token,
             'refresh_token': creds.refresh_token,
@@ -318,17 +382,27 @@ def refresh_google_token(credentials_dict: Dict) -> Dict:
             'client_id': creds.client_id,
             'client_secret': creds.client_secret,
             'scopes': creds.scopes,
-            'token_timestamp': datetime.utcnow()
+            'token_timestamp': datetime.utcnow().isoformat()
         }
     except Exception as e:
         logger.error(f"Token refresh failed: {str(e)}")
         raise GoogleAPIError("Failed to refresh Google token")
 
 def revoke_google_token(token: str) -> bool:
-    """Revoke Google OAuth token"""
+    """
+    Revoke Google OAuth token
+    
+    Args:
+        token: Token to revoke
+        
+    Returns:
+        bool: True if revocation successful, False otherwise
+    """
     try:
+        # Use Google's token revocation endpoint
+        revoke_uri = "https://oauth2.googleapis.com/revoke"
         response = requests.post(
-            GoogleOAuthConfig.GOOGLE_REVOKE_URI,
+            revoke_uri,
             params={'token': token},
             headers={'content-type': 'application/x-www-form-urlencoded'}
         )
