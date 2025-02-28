@@ -2,7 +2,7 @@
 from datetime import datetime
 import uuid
 import logging
-from config import Config
+from config.base_config import Config
 from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
