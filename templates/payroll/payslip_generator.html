@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block left_panel %}
+<div class="max-w-4xl mx-auto bg-white p-6 shadow-md">
+    <h1 class="text-2xl font-bold mb-6 text-center">Payslip Generator</h1>
+    <form id="payslipForm" class="space-y-6">
+        <div class="grid grid-cols-2 gap-6">
+            <!-- Employee Details -->
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold">Employee Details</h2>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Employee Name</label>
+                    <input type="text" id="employeeName" name="employee_name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Street Address</label>
+                    <input type="text" id="streetAddress" name="street_address" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Suburb</label>
+                    <input type="text" id="suburb" name="suburb" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">State</label>
+                        <input type="text" id="state" name="state" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Postcode</label>
+                        <input type="text" id="postcode" name="postcode" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employment Details -->
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold">Employment Details</h2>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Annual Salary</label>
+                    <input type="number" id="annualSalary" name="annual_salary" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Classification</label>
+                    <input type="text" id="classification" name="classification" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Pay Frequency</label>
+                    <select id="payFrequency" name="pay_frequency" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="weekly">Weekly</option>
+                        <option value="fortnightly" selected>Fortnightly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leave Details -->
+        <div class="space-y-4">
+            <h2 class="text-lg font-semibold">Leave Details</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Annual Leave (Hours)</label>
+                    <input type="number" id="annualLeave" name="annual_leave" value="0" step="0.01" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Sick Leave (Hours)</label>
+                    <input type="number" id="sickLeave" name="sick_leave" value="0" step="0.01" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Personal Leave (Hours)</label>
+                    <input type="number" id="personalLeave" name="personal_leave" value="0" step="0.01" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Details -->
+        <div class="space-y-4">
+            <h2 class="text-lg font-semibold">Payment Details</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Bank Account</label>
+                    <input type="text" id="bankAccount" name="bank_account" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Account Holder</label>
+                    <input type="text" id="accountHolder" name="account_holder" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            Generate Payslip
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block right_panel %}
+<div id="payslipOutput" class="w-full">
+    <!-- Generated payslip will be inserted here -->
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('payslipForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetch('/generate_payslip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.text();
+            document.getElementById('payslipOutput').innerHTML = result;
+            
+            // Initialize PDF generation after content loads
+            initPDFGeneration();
+
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('payslipOutput').innerHTML = `
+                <div class="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                    Error generating payslip: ${error.message}
+                </div>
+            `;
+        }
+    });
+
+    function initPDFGeneration() {
+        window.generatePDF = async function() {
+            const element = document.getElementById('payslipContent');
+            const options = {
+                logging: true,
+                scale: 2, // Increase for better quality
+                useCORS: true,
+                windowWidth: element.scrollWidth,
+                windowHeight: element.scrollHeight
+            };
+
+            try {
+                // Show loading state
+                const btn = document.querySelector('[onclick="generatePDF()"]');
+                btn.innerHTML = 'Generating...';
+                btn.disabled = true;
+
+                const canvas = await html2canvas(element, options);
+                const imgData = canvas.toDataURL('image/png');
+                
+                const pdf = new jspdf.jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const imgRatio = canvas.width / canvas.height;
+                
+                let imgWidth = pageWidth;
+                let imgHeight = pageWidth / imgRatio;
+
+                if(imgHeight > pageHeight) {
+                    imgHeight = pageHeight;
+                    imgWidth = imgHeight * imgRatio;
+                }
+
+                const x = (pageWidth - imgWidth) / 2;
+                const y = (pageHeight - imgHeight) / 2;
+
+                pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+                pdf.save('payslip.pdf');
+
+            } catch (error) {
+                console.error('PDF generation failed:', error);
+                alert('Failed to generate PDF. Please try again.');
+            } finally {
+                // Reset button state
+                const btn = document.querySelector('[onclick="generatePDF()"]');
+                if(btn) {
+                    btn.innerHTML = 'Download PDF';
+                    btn.disabled = false;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
