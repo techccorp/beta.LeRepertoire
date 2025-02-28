@@ -233,7 +233,7 @@ from .request_utils import (
 # -----------------------------------#
 #    Session Management Utilities    #
 # -----------------------------------#    
-from .session_utils import (
+from .auth.session_utils import (  # FIXED: Changed from .session_utils to .auth.session_utils
     create_session,
     get_session,
     delete_session,
