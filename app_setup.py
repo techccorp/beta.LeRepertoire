@@ -12,7 +12,7 @@ from pymongo import MongoClient
 import redis
 
 # Import configuration modules - Updated to use the standardized import approach
-from config import Config
+from config import Config, GoogleOAuthConfig, GoogleOAuthConfigError
 
 # Import database modules
 from db.indexes_setup import setup_all_indexes
@@ -118,6 +118,41 @@ def setup_repositories(app):
         logger.error(f"Error setting up repositories: {str(e)}")
         raise
 
+def setup_google_oauth(app):
+    """Set up Google OAuth components."""
+    try:
+        # Validate Google OAuth configuration
+        try:
+            GoogleOAuthConfig.validate_config()
+            
+            # Store OAuth configuration in app
+            app.config['GOOGLE_CLIENT_ID'] = GoogleOAuthConfig.GOOGLE_CLIENT_ID
+            app.config['GOOGLE_CLIENT_SECRET'] = GoogleOAuthConfig.GOOGLE_CLIENT_SECRET
+            app.config['GOOGLE_DISCOVERY_URL'] = GoogleOAuthConfig.GOOGLE_DISCOVERY_URL
+            app.config['GOOGLE_AUTH_URI'] = GoogleOAuthConfig.GOOGLE_AUTH_URI
+            app.config['GOOGLE_TOKEN_URI'] = GoogleOAuthConfig.GOOGLE_TOKEN_URI
+            app.config['GOOGLE_REDIRECT_URI'] = GoogleOAuthConfig.GOOGLE_REDIRECT_URI
+            app.config['GOOGLE_SCOPES'] = GoogleOAuthConfig.GOOGLE_SCOPES
+            
+            # Add all OAuth configuration as a dictionary for easy access
+            app.config['GOOGLE_OAUTH_CONFIG'] = GoogleOAuthConfig.get_oauth_config()
+            
+            logger.info("Google OAuth components configured")
+            return True
+        except GoogleOAuthConfigError as e:
+            # In development mode, we'll continue without Google OAuth
+            if app.config.get('DEBUG', False):
+                logger.warning(f"Google OAuth not configured properly: {str(e)}")
+                logger.warning("Google OAuth features will not be available")
+                return False
+            else:
+                # In production, this is a critical error
+                raise
+            
+    except Exception as e:
+        logger.error(f"Error setting up Google OAuth: {str(e)}")
+        raise
+
 def setup_auth_components(app, redis_client=None):
     """Set up authentication components."""
     try:
@@ -135,6 +170,9 @@ def setup_auth_components(app, redis_client=None):
         mfa_manager = init_mfa_manager(app)
         app.mfa_manager = mfa_manager
         logger.info("MFA manager initialized")
+        
+        # Initialize Google OAuth
+        setup_google_oauth(app)
         
         # Try to initialize the permission manager
         try:
@@ -172,6 +210,8 @@ def setup_services(app, redis_client=None):
     try:
         # Initialize authentication service
         auth_service = init_auth_service(app)
+        app.auth_service = auth_service
+        logger.info("Authentication service initialized")
         
         # Initialize permission service if not already initialized
         if not hasattr(app, 'permission_manager'):
