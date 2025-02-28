@@ -9,21 +9,18 @@ Provides centralized access to all utility functions and classes.
 # ---------------------------------------#
 #     Authentication Utilities           #
 # ---------------------------------------#
-# Import core auth utilities
 from .auth.auth_utils import (
     hash_password,
     check_password,
     validate_payroll_id
 )
 
-# Import auth module components
 from .auth import (
     SessionManager,
     SessionExpiredError,
     AuthManager
 )
 
-# Import auth decorators
 from .auth.decorators import (
     login_required,
     require_permission,
@@ -56,8 +53,7 @@ from .recipe_utils import (
     lookup_dietary,
     lookup_mealtype,
     lookup_recipeIngredient,
-    lookup_globalRecipe,
-    lookup_allergen
+    lookup_globalRecipe
 )
 
 # ---------------------------------------#
@@ -104,13 +100,14 @@ from .business_utils import (
 from .google_utils import (
     validate_google_token,
     get_google_service,
-    KeepService  # Import the KeepService class
+    KeepService
 )
 
 # ---------------------------------------#
-#           Security Utilities           #
+#          Defense Utilities             #
 # ---------------------------------------#    
-from .security_utils import (
+from .defense import (
+    # Security
     generate_random_string,
     generate_secure_token,
     generate_id_with_prefix,
@@ -118,13 +115,12 @@ from .security_utils import (
     constant_time_compare,
     generate_session_id,
     sanitize_input,
-    log_security_event
-)
-
-# ---------------------------------------#
-#          Validation Utilities          #
-# ---------------------------------------#    
-from .validation_utils import (
+    log_security_event,
+    
+    # Rate Limiting
+    RateLimiter,
+    
+    # Validation
     validate_request_data,
     validate_id_format,
     validate_uuid,
@@ -221,7 +217,6 @@ from .logging import (
 # ----------------------------------#    
 from .request_utils import (
     get_request_data,
-    validate_request_data,
     format_response,
     paginate_results,
     parse_query_params,
@@ -386,7 +381,6 @@ __all__ = [
     'lookup_mealtype',
     'lookup_recipeIngredient',
     'lookup_globalRecipe',
-    'lookup_allergen',
     
     # Time Management
     'timeago',
@@ -419,6 +413,7 @@ __all__ = [
     'get_google_service',
     'KeepService',
     
+    # Defense
     # Security
     'generate_random_string',
     'generate_secure_token',
@@ -428,7 +423,8 @@ __all__ = [
     'generate_session_id',
     'sanitize_input',
     'log_security_event',
-    
+    # Rate Limiting
+    'RateLimiter',
     # Validation
     'validate_request_data',
     'validate_id_format',
@@ -503,7 +499,6 @@ __all__ = [
     
     # Request Processing
     'get_request_data',
-    'validate_request_data',
     'format_response',
     'paginate_results',
     'parse_query_params',
