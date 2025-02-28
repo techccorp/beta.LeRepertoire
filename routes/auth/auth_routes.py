@@ -103,15 +103,14 @@ def create_session_token(user):
     """
     try:
         if hasattr(current_app, 'token_manager'):
-            # Use the new TokenManager to generate tokens
             return current_app.token_manager.generate_token(user)
         else:
-            # Fall back to the old method if TokenManager isn't initialized
+            # Updated to match new schema field names
             payload = {
                 'payroll_id': user['payroll_id'],
-                'email_work': user['work_email'],
-                'role': user['role'],
-                'business_id': user['company_id'],
+                'work_email': user['work_email'],  # Changed from email_work
+                'role_name': user['role_name'],    # Changed from role
+                'company_id': user['company_id'],  # Changed from business_id
                 'venue_id': user['venue_id'],
                 'work_area_id': user['work_area_id'],
                 'exp': datetime.utcnow() + timedelta(hours=8),
@@ -161,7 +160,7 @@ def login():
 
         # Find user in MongoDB using the updated document structure
         user = current_app.mongo.db.business_users.find_one({
-            "payroll_id": payroll_id,
+            "payroll_id": payroll_id,  # Direct field access
             "status": {"$ne": "inactive"}
         })
 
@@ -174,7 +173,7 @@ def login():
             }), 401
 
         # Verify password using the imported utility function
-        if not check_password(user['password'], password):
+        if not check_password(user['password'], password):  # Direct field access
             login_limiter.record_attempt(payroll_id, success=False)
             logger.warning(f"Failed login attempt for payroll ID: {payroll_id}")
             return jsonify({
@@ -191,31 +190,27 @@ def login():
         # Update last login timestamp
         current_app.mongo.db.business_users.update_one(
             {"_id": user["_id"]},
-            {
-                "$set": {
-                    "last_login": datetime.utcnow()
-                }
-            }
+            {"$set": {"last_login": datetime.utcnow()}}
         )
 
         # Log successful login
         AuditLogger.log_event(
             'user_login',
             payroll_id,
-            user.get('company_id', 'N/A'),
+            user['company_id'],  # Changed from business_id
             'Successful login',
             ip_address=request.remote_addr
         )
 
-        # Prepare user data for response
+        # Prepare user data for response with new schema fields
         user_data = {
             "payroll_id": user['payroll_id'],
-            "email_work": user['work_email'],
-            "name_first": user['first_name'],
-            "name_preferred": user.get('preferred_name'),
-            "role": user['role'],
+            "work_email": user['work_email'],  # Changed from email_work
+            "first_name": user['first_name'],
+            "preferred_name": user.get('preferred_name'),
+            "role_name": user['role_name'],  # Changed from role
             "permissions": user.get('permissions', []),
-            "business_id": user['company_id'],
+            "company_id": user['company_id'],  # Changed from business_id
             "venue_id": user['venue_id'],
             "work_area_id": user['work_area_id']
         }
@@ -265,10 +260,10 @@ def verify_token_route():
             "valid": True,
             "user": {
                 "payroll_id": user['payroll_id'],
-                "email_work": user['work_email'],
-                "name_first": user['first_name'],
-                "name_preferred": user.get('preferred_name'),
-                "role": user['role'],
+                "work_email": user['work_email'],  # Changed from email_work
+                "first_name": user['first_name'],
+                "preferred_name": user.get('preferred_name'),
+                "role_name": user['role_name'],  # Changed from role
                 "permissions": user.get('permissions', [])
             }
         })
@@ -293,6 +288,7 @@ def logout():
     """
     try:
         # Revoke the current token if TokenManager is available
+ ```python
         if hasattr(current_app, 'token_manager') and hasattr(g, 'token'):
             current_app.token_manager.revoke_token(token=g.token)
             logger.info(f"Token revoked for user {g.user.get('payroll_id')}")
@@ -301,8 +297,8 @@ def logout():
         AuditLogger.log_event(
             'user_logout',
             g.user['payroll_id'],
-            g.current_user.get('company_id', 'N/A'),
-            'User logged out',
+            g.current_user['company_id'],  # Changed from business_id
+            'User  logged out',
             ip_address=request.remote_addr
         )
         
@@ -340,7 +336,7 @@ def revoke_all_tokens():
         if not payroll_id:
             return jsonify({
                 "success": False,
-                "message": "User identification missing"
+                "message": "User  identification missing"
             }), 400
 
         # Revoke all tokens for the user
@@ -351,7 +347,7 @@ def revoke_all_tokens():
             AuditLogger.log_event(
                 'tokens_revoked',
                 payroll_id,
-                g.current_user.get('company_id', 'N/A'),
+                g.current_user['company_id'],  # Changed from business_id
                 'All user tokens revoked',
                 ip_address=request.remote_addr
             )
