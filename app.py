@@ -18,6 +18,8 @@ from datetime import datetime
 from io import BytesIO
 import gridfs
 import json
+import requests
+from authlib.integrations.flask_client import OAuth
 
 # Import from utils package - maintaining original imports
 from utils import (
@@ -261,7 +263,7 @@ from utils import (
 )
 
 # Import configuration and services
-from config import Config
+from config import Config, GoogleOAuthConfig, GoogleOAuthConfigError
 from id_service import IDService
 from models import get_db as models_get_db, get_search_db
 
@@ -282,10 +284,10 @@ logger.info("Environment variables loaded successfully")
 # -------------------------------------#
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
-# -------------------------------------#
-#          Initialize CORS
-# -------------------------------------#
-CORS(app)
+# Verify static folder exists
+if not os.path.exists(app.static_folder):
+    os.makedirs(app.static_folder, exist_ok=True)
+    logger.info(f"Created static folder: {app.static_folder}")
 
 # -------------------------------------#
 #     Application Configuration
@@ -293,12 +295,19 @@ CORS(app)
 app.config.from_object(Config)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
 
+# Validate secret key in production
+if app.config['SECRET_KEY'] == 'a_secure_random_key' and not app.config.get('DEBUG', False):
+    logger.critical("Default secret key detected in production! This is a security risk.")
+    raise RuntimeError("Cannot use default secret key in production")
+
 # -------------------------------------#
 #     Initialize CSRF protection
 # -------------------------------------#
 csrf = CSRFProtect(app)
 
-# Initialize CORS
+# -------------------------------------#
+#          Initialize CORS
+# -------------------------------------#
 CORS(app, resources={
     r"/*": {
         "origins": "*",
@@ -362,6 +371,44 @@ class JSONEncoder(json.JSONEncoder):
 #     Set the custom JSON encoder
 # -------------------------------------#
 app.json_encoder = JSONEncoder
+
+# -------------------------------------#
+# Initialize Google OAuth
+# -------------------------------------#
+try:
+    # Initialize OAuth
+    oauth = OAuth(app)
+    
+    # Configure Google OAuth 
+    try:
+        GoogleOAuthConfig.validate_config()
+        
+        # Register Google OAuth with Authlib
+        google = oauth.register(
+            name='google',
+            client_id=GoogleOAuthConfig.GOOGLE_CLIENT_ID,
+            client_secret=GoogleOAuthConfig.GOOGLE_CLIENT_SECRET,
+            server_metadata_url=GoogleOAuthConfig.GOOGLE_DISCOVERY_URL,
+            client_kwargs={
+                'scope': ' '.join(GoogleOAuthConfig.GOOGLE_SCOPES)
+            }
+        )
+        
+        # Store in app for easy access
+        app.google = google
+        logger.info("Google OAuth initialized successfully")
+    except GoogleOAuthConfigError as e:
+        if app.config.get('DEBUG', False):
+            logger.warning(f"Google OAuth not configured properly: {str(e)}")
+            # Create a mock for development to prevent errors
+            from unittest.mock import MagicMock
+            app.google = MagicMock()
+            logger.info("Using mock Google OAuth client for development")
+        else:
+            raise
+except Exception as e:
+    logger.critical(f"Failed to initialize OAuth: {str(e)}")
+    raise
 
 # -------------------------------------#
 # Initialize Session and Permission Management
@@ -471,8 +518,13 @@ blueprints = [
 ]
 
 for bp, name in blueprints:
-    app.register_blueprint(bp)
-    logger.info(f"{name} blueprint initialized successfully")
+    try:
+        app.register_blueprint(bp)
+        logger.info(f"{name} blueprint initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to register {name} blueprint: {str(e)}")
+        if not app.config.get('DEBUG', False):
+            raise
 
 # -------------------------------------#
 #           Initialize modules
@@ -490,29 +542,41 @@ def index():
 
 @app.route('/login')
 def login():
-    redirect_uri = app.config['REDIRECT_URI']
-    return google.authorize_redirect(redirect_uri)
+    redirect_uri = app.config.get('REDIRECT_URI', GoogleOAuthConfig.GOOGLE_REDIRECT_URI)
+    return app.google.authorize_redirect(redirect_uri)
 
 @app.route('/logout')
 def logout():
-    session.pop('user')
+    session.pop('user', None)
     return redirect(url_for('index'))
 
 @app.route('/login/authorized')
 def authorized():
-    token = google.authorize_access_token()
-    resp = google.get('userinfo')
-    user_info = resp.json()
-    session['user'] = user_info
-    return jsonify(user_info)
+    try:
+        token = app.google.authorize_access_token()
+        resp = app.google.get('userinfo')
+        user_info = resp.json()
+        session['user'] = user_info
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error in OAuth callback: {str(e)}")
+        return redirect(url_for('index'))
 
 @app.route('/login/google', methods=['POST'])
 def login_google():
     token = request.json.get('id_token')
     if token:
-        session['user'] = token  # Replace with your logic
-        return jsonify(success=True, redirect_url=url_for('index'))
-    return jsonify(success=False, message='Invalid token.')
+        try:
+            # Verify token with Google
+            user_info = validate_google_token(token)
+            if user_info:
+                session['user'] = user_info
+                return jsonify(success=True, redirect_url=url_for('index'))
+            return jsonify(success=False, message='Invalid token.')
+        except Exception as e:
+            logger.error(f"Error validating Google token: {str(e)}")
+            return jsonify(success=False, message='Error validating token.')
+    return jsonify(success=False, message='Token is required.')
 
 @app.route('/favicon.ico')
 def favicon():
@@ -525,6 +589,9 @@ def favicon():
 @app.route('/image/<filename>', methods=['GET'])
 def get_image(filename):
     try:
+        # Sanitize filename to prevent path traversal
+        filename = secure_filename(filename)
+        
         file = fs.find_one({'filename': filename})
         
         if file:
@@ -597,7 +664,7 @@ def get_beef_cuts():
     try:
         # Fetch data from the 'meatspace' collection
         meatspace_data = list(db[Config.COLLECTION_MEATSPACE].find({}))
-        return jsonify(meatspace_data), 200
+        return jsonify(json.loads(dumps(meatspace_data))), 200
     except Exception as e:
         logger.error(f"Error fetching data from 'meatspace': {str(e)}")
         return jsonify({'error': 'Failed to retrieve data'}), 500
