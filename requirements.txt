@@ -4,6 +4,7 @@ aiosignal
 annotated-types
 anyio
 attrs
+authlib
 bcrypt
 blinker
 bunnycdnpython
