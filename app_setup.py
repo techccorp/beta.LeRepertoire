@@ -11,8 +11,8 @@ from flask import Flask
 from pymongo import MongoClient
 import redis
 
-# Import configuration modules
-from config.base_config import Config
+# Import configuration modules - Updated to use the standardized import approach
+from config import Config
 
 # Import database modules
 from db.indexes_setup import setup_all_indexes
