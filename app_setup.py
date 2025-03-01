@@ -7,6 +7,7 @@ Provides a central point for registering services, repositories, and middleware.
 """
 import logging
 import os
+import time  # Added for retry functionality
 from flask import Flask
 from pymongo import MongoClient
 import redis
@@ -50,7 +51,7 @@ def setup_logging(app):
     logger.info(f"Logging initialized with level {log_level}")
 
 def setup_database(app):
-    """Set up MongoDB database connection."""
+    """Set up MongoDB database connection with index safety."""
     try:
         # Get MongoDB URI from config
         mongo_uri = app.config.get('MONGO_URI', 'mongodb://localhost:27017/')
@@ -68,13 +69,22 @@ def setup_database(app):
         
         logger.info(f"Connected to MongoDB database: {db_name}")
         
-        # Set up indexes
-        setup_all_indexes(db)
+        # Set up indexes with error handling
+        try:
+            setup_all_indexes(db)
+        except Exception as index_error:
+            logger.error(f"Index setup failed: {str(index_error)}")
+            logger.info("Attempting to continue with existing indexes...")
         
         return app.mongo
         
     except Exception as e:
         logger.error(f"Error connecting to MongoDB: {str(e)}")
+        # Add automatic retry for production
+        if app.config.get('ENV') == 'production':
+            logger.info("Retrying database connection in 5 seconds...")
+            time.sleep(5)
+            return setup_database(app)
         raise
 
 def setup_redis(app):
