@@ -286,13 +286,15 @@ from .file_utils import (
 # ---------------------------------------#
 #         Caching Utilities              #
 # ---------------------------------------#    
-#from .cache_utils import (
-#    set_cache,
-#    get_cache,
-#    delete_cache,
-#    clear_cache,
-#    cache_key_generator
-#)
+from .redis_utils import (
+    set_cache,
+    get_cache,
+    delete_cache,
+    clear_cache,
+    cache_key_generator,
+    get_hash,
+    set_hash
+)
 
 # ---------------------------------------#
 #         Analytics Utilities            #
