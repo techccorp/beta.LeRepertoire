@@ -5,11 +5,18 @@ Provides centralized functions for config operations across different storage ba
 import json
 import logging
 import os
-import yaml
 from datetime import datetime
 from flask import current_app
 
 logger = logging.getLogger(__name__)
+
+# Try to import yaml, but don't fail if it's not available
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+    logger.warning("PyYAML not installed. YAML configuration features will be disabled.")
 
 def load_config(config_path=None, config_type=None):
     """
@@ -28,7 +35,11 @@ def load_config(config_path=None, config_type=None):
         if ext.lower() in ['.json']:
             config_type = 'json'
         elif ext.lower() in ['.yaml', '.yml']:
-            config_type = 'yaml'
+            if YAML_AVAILABLE:
+                config_type = 'yaml'
+            else:
+                logger.warning(f"YAML support not available. Falling back to JSON for file: {config_path}")
+                config_type = 'json'
         else:
             config_type = 'env'
     
@@ -36,7 +47,11 @@ def load_config(config_path=None, config_type=None):
     if config_type == 'json':
         return _load_json_config(config_path)
     elif config_type == 'yaml':
-        return _load_yaml_config(config_path)
+        if YAML_AVAILABLE:
+            return _load_yaml_config(config_path)
+        else:
+            logger.warning("YAML support not available. Falling back to environment variables.")
+            return _load_env_config()
     else:
         # Default to environment variables
         return _load_env_config()
@@ -78,6 +93,10 @@ def _load_yaml_config(config_path):
     Returns:
         dict: Configuration data
     """
+    if not YAML_AVAILABLE:
+        logger.error("PyYAML not installed. Cannot load YAML configuration.")
+        return {}
+        
     try:
         if not os.path.exists(config_path):
             logger.warning(f"Configuration file not found: {config_path}")
@@ -157,7 +176,11 @@ def save_config(config_data, config_path, config_type=None):
         if ext.lower() in ['.json']:
             config_type = 'json'
         elif ext.lower() in ['.yaml', '.yml']:
-            config_type = 'yaml'
+            if YAML_AVAILABLE:
+                config_type = 'yaml'
+            else:
+                logger.warning("YAML support not available. Saving as JSON instead.")
+                config_type = 'json'
         else:
             config_type = 'json'  # Default to JSON
     
@@ -167,6 +190,10 @@ def save_config(config_data, config_path, config_type=None):
     # Handle different configuration types
     try:
         if config_type == 'yaml':
+            if not YAML_AVAILABLE:
+                logger.error("PyYAML not installed. Cannot save YAML configuration.")
+                return False
+                
             with open(config_path, 'w') as config_file:
                 yaml.dump(config_data, config_file, default_flow_style=False)
         else:
