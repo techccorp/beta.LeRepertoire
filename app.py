@@ -265,8 +265,10 @@ from utils import (
 # Import configuration and services
 from config import Config, GoogleOAuthConfig, GoogleOAuthConfigError
 from services import get_service
-id_service = get_service('id_service')
-from models import get_db as models_get_db, get_search_db
+from id_service import IDService
+
+# Updated models import with register_teardown
+from models import get_db as models_get_db, get_search_db, register_teardown
 
 # -------------------------------------#
 #        Initialize logging
@@ -284,6 +286,7 @@ logger.info("Environment variables loaded successfully")
 #        Initialize Flask app
 # -------------------------------------#
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+register_teardown(app)  # Register database teardown handlers
 
 # Verify static folder exists
 if not os.path.exists(app.static_folder):
@@ -350,7 +353,13 @@ except Exception as e:
 #  Initialize IDService
 # -------------------------------------#
 try:
-    id_service = IDService(db)
+    # Try to get from service registry first
+    id_service = get_service('id_service')
+    
+    # If not available in service registry, create new instance
+    if not id_service:
+        id_service = IDService(db)
+        
     app.config['ID_SERVICE'] = id_service  # Make IDService available globally
     logger.info("ID Service initialized successfully")
 except Exception as e:
@@ -464,6 +473,17 @@ except Exception as e:
     raise
 
 # -------------------------------------#
+#           Initialize modules
+# -------------------------------------#
+try:
+    from modules import module_manager
+    module_manager.init_app(app)
+    logger.info("Module system initialized successfully")
+except Exception as e:
+    logger.critical(f"Failed to initialize module system: {str(e)}")
+    raise
+
+# -------------------------------------#
 #        Register routes
 # -------------------------------------#
 try:
@@ -526,16 +546,6 @@ for bp, name in blueprints:
         logger.error(f"Failed to register {name} blueprint: {str(e)}")
         if not app.config.get('DEBUG', False):
             raise
-
-# -------------------------------------#
-#           Initialize modules
-# -------------------------------------#
-try:
-    module_manager.init_app(app)
-    logger.info("Module system initialized successfully")
-except Exception as e:
-    logger.critical(f"Failed to initialize module system: {str(e)}")
-    raise
 
 @app.route('/')
 def index():
