@@ -4,11 +4,20 @@
 from typing import Dict, Optional, Any
 from flask import Flask
 import logging
-from .auth import (
-    PermissionManager,
-    BusinessContextValidator,
-    BusinessValidationError
-)
+import traceback
+from pymongo.errors import OperationFailure
+
+# Import from auth module with proper exception handling
+try:
+    from .auth import (
+        PermissionManager,
+        BusinessContextValidator,
+        BusinessValidationError
+    )
+except ImportError as e:
+    # Log the error but continue initialization - we'll handle it below
+    logging.error(f"Error importing auth components: {str(e)}")
+
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -56,6 +65,7 @@ class ModuleManager:
 
         except Exception as e:
             logger.critical(f"Failed to initialize modules: {str(e)}")
+            logger.debug(f"Initialization error details: {traceback.format_exc()}")
             raise RuntimeError(f"Module initialization failed: {str(e)}")
 
     def _init_auth_module(self, app: Flask) -> None:
@@ -66,25 +76,49 @@ class ModuleManager:
             app: Flask application instance
         """
         try:
-            # Initialize permission manager
-            permission_manager = PermissionManager(app.config['MONGO_CLIENT'][Config.MONGO_DBNAME])
-            self._services['permission_manager'] = permission_manager
+            # Get database reference
+            db = app.config.get('MONGO_CLIENT', {}).get(Config.MONGO_DBNAME)
+            if not db:
+                db = app.mongo.db if hasattr(app, 'mongo') and hasattr(app.mongo, 'db') else None
+                
+            if not db:
+                logger.error("Failed to get database reference for auth module")
+                raise ValueError("Database reference not available")
 
-            # Initialize business validator
-            business_validator = BusinessContextValidator(app.config['MONGO_CLIENT'][Config.MONGO_DBNAME])
+            # First check if the classes are available
+            if 'BusinessContextValidator' not in globals() or 'PermissionManager' not in globals():
+                # Try to import again to handle potential circular imports
+                try:
+                    from .auth import BusinessContextValidator, PermissionManager
+                except ImportError as e:
+                    logger.error(f"Failed to import auth components: {str(e)}")
+                    raise
+                    
+            # Initialize business validator (which includes work_area_id validation)
+            business_validator = BusinessContextValidator(db)
             self._services['business_validator'] = business_validator
 
-            # Set up database indexes
-            def setup_indexes():
-                BusinessContextValidator.setup_db_indexes(app.config['MONGO_CLIENT'][Config.MONGO_DBNAME])
+            # Initialize permission manager
+            permission_manager = PermissionManager(db)
+            self._services['permission_manager'] = permission_manager
 
-            with app.app_context():
-                setup_indexes()
-
+            # Set up database indexes with error handling
+            try:
+                with app.app_context():
+                    BusinessContextValidator.setup_db_indexes(db)
+            except OperationFailure as e:
+                # Log the error but continue initialization
+                logger.warning(f"Error setting up indexes: {str(e)}")
+                logger.info("Continuing initialization without complete index setup")
+            except Exception as e:
+                logger.error(f"Unexpected error setting up indexes: {str(e)}")
+                # Continue initialization despite index errors
+                
             logger.info("Auth module initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize auth module: {str(e)}")
+            logger.debug(f"Auth module initialization error details: {traceback.format_exc()}")
             raise
 
     def get_service(self, service_name: str) -> Optional[Any]:
@@ -103,9 +137,12 @@ class ModuleManager:
         """Cleanup and release resources."""
         try:
             # Cleanup services
-            for service in self._services.values():
+            for service_name, service in self._services.items():
                 if hasattr(service, 'cleanup'):
-                    service.cleanup()
+                    try:
+                        service.cleanup()
+                    except Exception as e:
+                        logger.error(f"Error cleaning up service {service_name}: {str(e)}")
 
             self._services.clear()
             self._modules.clear()
