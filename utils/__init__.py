@@ -343,13 +343,13 @@ from .config_utils import (
 # ---------------------------------------#
 #         Miscellaneous Utilities        #
 # ---------------------------------------#    
-# from .misc_utils import (
-#    generate_slug,
-#    format_currency,
-#    parse_json,
-#    format_json,
-#    get_current_timestamp
-# )
+from .misc_utils import (
+    generate_slug,
+    format_currency,
+    parse_json,
+    format_json,
+    get_current_timestamp
+ )
 
 __all__ = [
     # Authentication
