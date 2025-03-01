@@ -264,7 +264,8 @@ from utils import (
 
 # Import configuration and services
 from config import Config, GoogleOAuthConfig, GoogleOAuthConfigError
-from id_service import IDService
+from services import get_service
+id_service = get_service('id_service')
 from models import get_db as models_get_db, get_search_db
 
 # -------------------------------------#
