@@ -87,10 +87,10 @@ class ModuleManager:
                     pass
                     
             # If still no db, try the app.mongo.db approach
-            if not db:
+            if db is None:
                 db = app.mongo.db if hasattr(app, 'mongo') and hasattr(app.mongo, 'db') else None
                 
-            if not db:
+            if db is None:
                 logger.error("Failed to get database reference for auth module")
                 raise ValueError("Database reference not available")
 
@@ -128,6 +128,7 @@ class ModuleManager:
         except Exception as e:
             logger.error(f"Failed to initialize auth module: {str(e)}")
             logger.debug(f"Auth module initialization error details: {traceback.format_exc()}")
+            raise
             raise
 
     def get_service(self, service_name: str) -> Optional[Any]:
