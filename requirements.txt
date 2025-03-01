@@ -60,6 +60,7 @@ pyparsing
 PySocks
 pytest
 python-dotenv
+pyyaml
 requests
 requests-oauthlib
 rsa
