@@ -1,569 +1,322 @@
+# ------------------------------------------------------------
+# db/indexes_setup.py
+# ------------------------------------------------------------
 """
-File management utilities for secure uploads and processing.
-Production-ready implementation with error handling.
+Database index setup script for MongoDB collections.
+Creates optimized indexes for authentication and permission collections.
 """
-import os
-import uuid
 import logging
-import mimetypes
-from datetime import datetime
-from werkzeug.utils import secure_filename
-from PIL import Image
-from io import BytesIO
-from flask import current_app, url_for
-from gridfs import GridFS
-from bson.objectid import ObjectId
-from pymongo.errors import PyMongoError
-
-# Import error utilities for consistent error handling
-from .error_utils import ValidationError, NotFoundError, DatabaseError, AppError
-
-# Default allowed extensions for production safety
-DEFAULT_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt'}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+from pymongo import ASCENDING, DESCENDING, TEXT
 
 logger = logging.getLogger(__name__)
 
-def generate_file_name(original_filename):
+def handle_index_conflict(collection, index_specs, **kwargs):
     """
-    Generate a unique filename based on timestamp and UUID.
+    Handle potential index conflicts by dropping existing indexes and recreating them.
     
     Args:
-        original_filename (str): Original filename to preserve extension
-        
+        collection: MongoDB collection
+        index_specs: List of tuples defining index fields
+        **kwargs: Additional arguments for create_index
+    
     Returns:
-        tuple: (secure_filename, extension)
-    """
-    # Secure the filename to prevent path traversal
-    secure_name = secure_filename(original_filename)
-    
-    # Get the file extension
-    if '.' in secure_name:
-        file_ext = secure_name.rsplit('.', 1)[1].lower()
-    else:
-        file_ext = ''
-    
-    # Generate a unique name with timestamp and UUID
-    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-    unique_id = uuid.uuid4().hex
-    new_filename = f"{timestamp}_{unique_id}"
-    
-    if file_ext:
-        new_filename = f"{new_filename}.{file_ext}"
-    
-    return new_filename, file_ext
-
-def validate_file_type(filename, allowed_extensions=None):
-    """
-    Validate if the file type is allowed.
-    
-    Args:
-        filename (str): Filename to validate
-        allowed_extensions (set, optional): Set of allowed extensions. Defaults to None.
-        
-    Returns:
-        bool: True if file type is allowed, False otherwise
-    """
-    if allowed_extensions is None:
-        allowed_extensions = DEFAULT_ALLOWED_EXTENSIONS
-    
-    if '.' not in filename:
-        return False
-    
-    ext = filename.rsplit('.', 1)[1].lower()
-    return ext in allowed_extensions
-
-def upload_file(file_stream, allowed_extensions=None, upload_dir=None, max_size=MAX_FILE_SIZE, use_gridfs=True, metadata=None):
-    """
-    Secure file upload handler with production-grade validation.
-    
-    Args:
-        file_stream: File stream object (e.g., request.files['file'])
-        allowed_extensions (set, optional): Set of allowed extensions. Defaults to None.
-        upload_dir (str, optional): Directory to upload to if not using GridFS. Defaults to None.
-        max_size (int, optional): Maximum file size in bytes. Defaults to MAX_FILE_SIZE.
-        use_gridfs (bool, optional): Whether to use GridFS for storage. Defaults to True.
-        metadata (dict, optional): Additional file metadata. Defaults to None.
-        
-    Returns:
-        dict: File information including filename, path or id, and URL
-        
-    Raises:
-        ValidationError: If file validation fails
-        DatabaseError: If database storage fails
-        AppError: For other errors
+        Result of create_index operation or None if skipped
     """
     try:
-        # Validate input
-        if not file_stream or not hasattr(file_stream, 'filename') or file_stream.filename == '':
-            raise ValidationError("No file provided")
-        
-        # Check file size
-        file_stream.seek(0, os.SEEK_END)
-        size = file_stream.tell()
-        file_stream.seek(0)  # Reset file position
-        
-        if size > max_size:
-            raise ValidationError(f"File size exceeds maximum allowed {max_size/1024/1024}MB")
-        
-        # Set defaults
-        allowed_extensions = allowed_extensions or DEFAULT_ALLOWED_EXTENSIONS
-        
-        # Get the original filename
-        original_filename = file_stream.filename
-        
-        # Validate file type
-        if not validate_file_type(original_filename, allowed_extensions):
-            raise ValidationError(f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}")
-        
-        # Generate a unique filename
-        new_filename, file_ext = generate_file_name(original_filename)
-        
-        # Determine mime type
-        mime_type = get_mime_type(new_filename)
-        
-        # Prepare metadata
-        file_metadata = {
-            'original_filename': original_filename,
-            'filename': new_filename,
-            'content_type': mime_type,
-            'size': size,
-            'upload_date': datetime.utcnow(),
-            'user_id': metadata.get('user_id') if metadata else None
-        }
-        
-        # Add any additional metadata
-        if metadata:
-            file_metadata.update(metadata)
-        
-        result = {}
-        
-        if use_gridfs:
-            # Store in GridFS
-            try:
-                db = current_app.mongo.db
-                fs = GridFS(db)
-                
-                # Store the file in GridFS
-                file_id = fs.put(
-                    file_stream,
-                    filename=new_filename,
-                    content_type=mime_type,
-                    metadata=file_metadata
-                )
-                
-                # Update result with GridFS info
-                result = {
-                    'file_id': str(file_id),
-                    'filename': new_filename,
-                    'original_filename': original_filename,
-                    'content_type': mime_type,
-                    'size': size,
-                    'url': url_for('get_image', filename=new_filename, _external=True)
-                }
-                
-                # Store file metadata in a separate collection for easier querying
-                db.file_metadata.insert_one({
-                    'file_id': file_id,
-                    **file_metadata
-                })
-                
-                logger.info(f"File uploaded to GridFS: {new_filename} (ID: {file_id})")
-                
-            except PyMongoError as e:
-                logger.error(f"Database error storing file in GridFS: {str(e)}")
-                raise DatabaseError(f"Failed to store file: {str(e)}")
-        else:
-            # Store on filesystem
-            if not upload_dir:
-                upload_dir = current_app.config.get('UPLOAD_FOLDER', '/var/www/uploads')
+        # CRITICAL FIX: Never attempt to create unique index on _id field
+        if len(index_specs) == 1 and index_specs[0][0] == "_id":
+            logger.warning(f"Skipping index creation on _id field for {collection.name}")
+            return None
             
-            # Ensure upload directory exists
-            os.makedirs(upload_dir, exist_ok=True)
+        # Check any of the fields is _id
+        if any(field[0] == '_id' for field in index_specs):
+            logger.warning(f"Skipping index creation containing _id field for {collection.name}")
+            return None
             
-            # Full path to save the file
-            file_path = os.path.join(upload_dir, new_filename)
+        # For the specific idx_linking_id case, use that name if we're dealing with linking_id
+        if collection.name == "business_users" and len(index_specs) == 1 and index_specs[0][0] == "linking_id":
+            # Use the existing name to avoid conflicts
+            kwargs["name"] = "idx_linking_id"
+            logger.info(f"Using existing index name 'idx_linking_id' for linking_id field in {collection.name}")
+            return collection.create_index(index_specs, **kwargs)
             
-            # Save the file
-            file_stream.save(file_path)
+        # Try to create the index normally
+        return collection.create_index(index_specs, **kwargs)
+    except Exception as e:
+        # Check if it's an index conflict
+        if "Index already exists with a different name" in str(e):
+            # Get existing indexes
+            existing_indexes = collection.index_information()
             
-            # Store file metadata in database
-            try:
-                db = current_app.mongo.db
-                metadata_id = db.file_metadata.insert_one({
-                    'file_path': file_path,
-                    **file_metadata
-                }).inserted_id
-                
-                result = {
-                    'metadata_id': str(metadata_id),
-                    'filename': new_filename,
-                    'original_filename': original_filename,
-                    'content_type': mime_type,
-                    'size': size,
-                    'path': file_path,
-                    'url': url_for('get_image', filename=new_filename, _external=True)
-                }
-                
-                logger.info(f"File uploaded to filesystem: {file_path}")
-                
-            except PyMongoError as e:
-                # If database fails but file was saved, delete the file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                logger.error(f"Database error storing file metadata: {str(e)}")
-                raise DatabaseError(f"Failed to store file metadata: {str(e)}")
-        
-        # For images: create thumbnail version
-        if file_ext.lower() in IMAGE_EXTENSIONS:
-            try:
-                if use_gridfs:
-                    # For GridFS, need to read the file back
-                    file_obj = fs.get(file_id)
-                    img_data = file_obj.read()
-                    thumb_data = resize_image(BytesIO(img_data), (300, 300))
+            # Find the conflicting index by comparing key patterns
+            target_fields = [f for f, _ in index_specs]
+            for idx_name, idx_info in existing_indexes.items():
+                if idx_name == '_id_':  # Skip the default _id index
+                    continue
                     
-                    # Store thumbnail in GridFS
-                    thumb_filename = f"{new_filename.rsplit('.', 1)[0]}_thumb.{file_ext}"
-                    thumb_id = fs.put(
-                        thumb_data.getvalue(),
-                        filename=thumb_filename,
-                        content_type=mime_type,
-                        metadata={'original_file_id': file_id, 'is_thumbnail': True}
-                    )
-                    
-                    result['thumbnail_id'] = str(thumb_id)
-                    result['thumbnail_url'] = url_for('get_image', filename=thumb_filename, _external=True)
-                else:
-                    # For filesystem storage
-                    thumb_path = os.path.join(upload_dir, f"{new_filename.rsplit('.', 1)[0]}_thumb.{file_ext}")
-                    create_thumbnail(file_path, thumb_path)
-                    result['thumbnail_path'] = thumb_path
-                    result['thumbnail_url'] = url_for('get_image', filename=os.path.basename(thumb_path), _external=True)
-            except Exception as e:
-                logger.warning(f"Thumbnail creation failed: {str(e)}")
-                # Continue even if thumbnail creation fails
-        
-        return result
-        
-    except ValidationError:
-        raise
-    except DatabaseError:
-        raise
-    except Exception as e:
-        logger.error(f"File upload failed: {str(e)}")
-        raise AppError(f"File upload failed: {str(e)}")
-
-def delete_file(file_id=None, filename=None, use_gridfs=True):
-    """
-    Delete a file from storage.
-    
-    Args:
-        file_id (str, optional): ID of the file to delete. Defaults to None.
-        filename (str, optional): Filename to delete if file_id not provided. Defaults to None.
-        use_gridfs (bool, optional): Whether file is stored in GridFS. Defaults to True.
-        
-    Returns:
-        bool: True if file was deleted successfully
-        
-    Raises:
-        ValidationError: If neither file_id nor filename is provided
-        NotFoundError: If file not found
-        DatabaseError: If database operation fails
-    """
-    try:
-        if not file_id and not filename:
-            raise ValidationError("Either file_id or filename must be provided")
-        
-        db = current_app.mongo.db
-        
-        if use_gridfs:
-            fs = GridFS(db)
+                # Compare field names (ignoring sort direction)
+                idx_fields = [f for f, _ in idx_info.get('key', [])]
+                if set(idx_fields) == set(target_fields):
+                    # Found the conflicting index - drop it
+                    logger.info(f"Dropping conflicting index '{idx_name}' in {collection.name}")
+                    collection.drop_index(idx_name)
+                    break
             
-            # Find the file by ID or filename
-            if file_id:
-                if isinstance(file_id, str) and ObjectId.is_valid(file_id):
-                    file_id = ObjectId(file_id)
-                
-                if not fs.exists(file_id):
-                    raise NotFoundError(f"File with ID {file_id} not found")
-                
-                # Get file metadata before deletion for thumbnail deletion
-                file_metadata = db.file_metadata.find_one({'file_id': file_id})
-                filename = fs.get(file_id).filename
-                
-                # Delete from GridFS
-                fs.delete(file_id)
-                
-                # Delete metadata
-                db.file_metadata.delete_one({'file_id': file_id})
-                
-                logger.info(f"Deleted file from GridFS: {filename} (ID: {file_id})")
-            else:
-                # Find by filename
-                file = fs.find_one({'filename': filename})
-                if not file:
-                    raise NotFoundError(f"File with name {filename} not found")
-                
-                file_id = file._id
-                
-                # Delete from GridFS
-                fs.delete(file_id)
-                
-                # Delete metadata
-                db.file_metadata.delete_one({'file_id': file_id})
-                
-                logger.info(f"Deleted file from GridFS: {filename}")
-            
-            # Check for and delete thumbnail
-            try:
-                # Extract base filename without extension
-                if '.' in filename:
-                    base_filename = filename.rsplit('.', 1)[0]
-                    ext = filename.rsplit('.', 1)[1]
-                    thumb_filename = f"{base_filename}_thumb.{ext}"
-                    
-                    # Look for thumbnail
-                    thumb_file = fs.find_one({'filename': thumb_filename})
-                    if thumb_file:
-                        fs.delete(thumb_file._id)
-                        logger.info(f"Deleted thumbnail from GridFS: {thumb_filename}")
-                    
-                    # Also look for thumbnail by metadata
-                    thumb_by_meta = fs.find_one({'metadata.original_file_id': file_id})
-                    if thumb_by_meta:
-                        fs.delete(thumb_by_meta._id)
-                        logger.info(f"Deleted thumbnail by metadata reference from GridFS")
-            except Exception as e:
-                logger.warning(f"Error deleting thumbnail: {str(e)}")
-                # Continue even if thumbnail deletion fails
+            # Now recreate the index
+            logger.info(f"Recreating index in {collection.name}")
+            return collection.create_index(index_specs, **kwargs)
+        elif "The field 'unique' is not valid for an *id index specification" in str(e):
+            # This is the specific error we're fixing
+            logger.warning(f"Cannot create unique index on _id field for {collection.name}")
+            return None
         else:
-            # File stored on filesystem
-            if filename:
-                # Find file metadata by filename
-                file_metadata = db.file_metadata.find_one({'filename': filename})
-            else:
-                # Find file metadata by ID
-                file_metadata = db.file_metadata.find_one({'_id': ObjectId(file_id)})
-            
-            if not file_metadata:
-                raise NotFoundError(f"File metadata not found")
-            
-            # Get file path
-            file_path = file_metadata.get('file_path')
-            if not file_path or not os.path.exists(file_path):
-                logger.warning(f"File not found on disk: {file_path}")
-            else:
-                # Delete file from filesystem
-                os.remove(file_path)
-                logger.info(f"Deleted file from filesystem: {file_path}")
-                
-                # Check for and delete thumbnail
-                try:
-                    if '.' in file_path:
-                        base_path = file_path.rsplit('.', 1)[0]
-                        ext = file_path.rsplit('.', 1)[1]
-                        thumb_path = f"{base_path}_thumb.{ext}"
-                        
-                        if os.path.exists(thumb_path):
-                            os.remove(thumb_path)
-                            logger.info(f"Deleted thumbnail from filesystem: {thumb_path}")
-                except Exception as e:
-                    logger.warning(f"Error deleting thumbnail: {str(e)}")
-                    # Continue even if thumbnail deletion fails
-            
-            # Delete metadata
-            if filename:
-                db.file_metadata.delete_one({'filename': filename})
-            else:
-                db.file_metadata.delete_one({'_id': ObjectId(file_id)})
-            
-            logger.info(f"Deleted file metadata from database")
-        
-        return True
-        
-    except NotFoundError:
-        raise
-    except ValidationError:
-        raise
-    except PyMongoError as e:
-        logger.error(f"Database error deleting file: {str(e)}")
-        raise DatabaseError(f"Failed to delete file: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error deleting file: {str(e)}")
-        raise AppError(f"Failed to delete file: {str(e)}")
+            # If it's not an index conflict, re-raise the exception
+            logger.error(f"Index creation error: {str(e)}")
+            # Don't raise, just return None to continue with other indexes
+            return None
 
-def get_file_url(file_id=None, filename=None, thumbnail=False):
+def setup_authentication_indexes(db):
     """
-    Get URL for a file.
+    Set up indexes for authentication-related collections.
+    Added validation to check collection existence and prevent _id index creation.
     
     Args:
-        file_id (str, optional): ID of the file. Defaults to None.
-        filename (str, optional): Filename if file_id not provided. Defaults to None.
-        thumbnail (bool, optional): Whether to get thumbnail URL. Defaults to False.
-        
-    Returns:
-        str: URL to access the file
-        
-    Raises:
-        ValidationError: If neither file_id nor filename is provided
-        NotFoundError: If file not found
-        DatabaseError: If database operation fails
+        db: MongoDB database instance
     """
     try:
-        if not file_id and not filename:
-            raise ValidationError("Either file_id or filename must be provided")
-        
-        db = current_app.mongo.db
-        
-        # Find file metadata
-        if file_id:
-            if isinstance(file_id, str) and ObjectId.is_valid(file_id):
-                file_id = ObjectId(file_id)
+        # Validate collection exists before indexing
+        if 'business_users' not in db.list_collection_names():
+            logger.warning("business_users collection does not exist, skipping indexes")
+            return
             
-            file_metadata = db.file_metadata.find_one({'file_id': file_id})
-            if not file_metadata:
-                raise NotFoundError(f"File with ID {file_id} not found")
-                
-            filename = file_metadata.get('filename')
+        # User indexes - added existence check for payroll_id field
+        logger.info("Setting up indexes for business_users collection...")
+        if db.business_users.count_documents({}) > 0:
+            handle_index_conflict(db.business_users, [("payroll_id", ASCENDING)], unique=True, name="idx_users_payroll_id")
+            handle_index_conflict(db.business_users, [("work_email", ASCENDING)], name="idx_users_work_email")
+            
+            # Special case - use the existing idx_linking_id name
+            handle_index_conflict(db.business_users, [("linking_id", ASCENDING)], name="idx_linking_id")
+            
+            handle_index_conflict(db.business_users, [("company_id", ASCENDING), ("status", ASCENDING)], name="idx_users_company_status")
+            handle_index_conflict(db.business_users, [("venue_id", ASCENDING), ("status", ASCENDING)], name="idx_users_venue_status")
+            handle_index_conflict(db.business_users, [("work_area_id", ASCENDING), ("status", ASCENDING)], name="idx_users_workarea_status")
+            handle_index_conflict(db.business_users, [("role", ASCENDING)], name="idx_users_role")
+            handle_index_conflict(db.business_users, [("last_login", DESCENDING)], name="idx_users_last_login")
         else:
-            file_metadata = db.file_metadata.find_one({'filename': filename})
-            if not file_metadata:
-                raise NotFoundError(f"File with name {filename} not found")
+            logger.warning("business_users collection is empty, skipping user-specific indexes")
         
-        # Modify filename for thumbnail if requested
-        if thumbnail:
-            if '.' in filename:
-                base_filename = filename.rsplit('.', 1)[0]
-                ext = filename.rsplit('.', 1)[1]
-                filename = f"{base_filename}_thumb.{ext}"
-        
-        # Generate URL
-        url = url_for('get_image', filename=filename, _external=True)
-        
-        return url
-        
-    except NotFoundError:
-        raise
-    except ValidationError:
-        raise
-    except PyMongoError as e:
-        logger.error(f"Database error getting file URL: {str(e)}")
-        raise DatabaseError(f"Failed to get file URL: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error getting file URL: {str(e)}")
-        raise AppError(f"Failed to get file URL: {str(e)}")
-
-def get_mime_type(filename):
-    """
-    Get MIME type from filename.
-    
-    Args:
-        filename (str): Filename to get MIME type for
-        
-    Returns:
-        str: MIME type or 'application/octet-stream' if not determined
-    """
-    mime_type, encoding = mimetypes.guess_type(filename)
-    if mime_type is None:
-        mime_type = 'application/octet-stream'
-    return mime_type
-
-def resize_image(image_stream, size, format=None, quality=85):
-    """
-    Resize an image to the specified size.
-    
-    Args:
-        image_stream: Image file stream or path
-        size (tuple): Target size as (width, height)
-        format (str, optional): Output format. Defaults to None (same as input).
-        quality (int, optional): JPEG quality (1-100). Defaults to 85.
-        
-    Returns:
-        BytesIO: Resized image stream
-        
-    Raises:
-        ValidationError: If image processing fails
-    """
-    try:
-        # Open the image
-        if isinstance(image_stream, str):
-            # If a file path is provided
-            img = Image.open(image_stream)
+        # Session indexes
+        if 'active_sessions' not in db.list_collection_names():
+            logger.warning("active_sessions collection does not exist, skipping indexes")
         else:
-            # If a file stream is provided
-            img = Image.open(image_stream)
+            logger.info("Setting up indexes for active_sessions collection...")
+            handle_index_conflict(db.active_sessions, [("session_id", ASCENDING)], unique=True, name="idx_sessions_id")
+            handle_index_conflict(db.active_sessions, [("user_id", ASCENDING)], name="idx_sessions_user_id")
+            handle_index_conflict(db.active_sessions, [("last_activity", ASCENDING)], name="idx_sessions_last_activity")
+            handle_index_conflict(db.active_sessions, [("created_at", ASCENDING)], name="idx_sessions_created_at")
+            handle_index_conflict(db.active_sessions, [("expires_at", ASCENDING)], name="idx_sessions_expires_at")
         
-        # Convert to RGB if RGBA to avoid issues with JPEG
-        if img.mode == 'RGBA' and (not format or format.lower() == 'jpeg' or format.lower() == 'jpg'):
-            img = img.convert('RGB')
+        # Refresh token indexes
+        if 'refresh_tokens' not in db.list_collection_names():
+            logger.warning("refresh_tokens collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for refresh_tokens collection...")
+            handle_index_conflict(db.refresh_tokens, [("token", ASCENDING)], unique=True, name="idx_refresh_token")
+            handle_index_conflict(db.refresh_tokens, [("user_id", ASCENDING)], name="idx_refresh_user_id")
+            handle_index_conflict(db.refresh_tokens, [("expires_at", ASCENDING)], name="idx_refresh_expires_at")
         
-        # Resize the image while preserving aspect ratio
-        img.thumbnail(size, Image.LANCZOS)
+        # Revoked token indexes
+        if 'revoked_tokens' not in db.list_collection_names():
+            logger.warning("revoked_tokens collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for revoked_tokens collection...")
+            handle_index_conflict(db.revoked_tokens, [("jti", ASCENDING)], unique=True, name="idx_revoked_jti")
+            handle_index_conflict(db.revoked_tokens, [("expires_at", ASCENDING)], name="idx_revoked_expires_at")
+            handle_index_conflict(db.revoked_tokens, [("revoked_at", ASCENDING)], name="idx_revoked_revoked_at")
         
-        # Save to BytesIO
-        output = BytesIO()
+        # MFA indexes
+        if 'mfa' not in db.list_collection_names():
+            logger.warning("mfa collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for mfa collection...")
+            handle_index_conflict(db.mfa, [("payroll_id", ASCENDING)], unique=True, name="idx_mfa_payroll_id")
+            handle_index_conflict(db.mfa, [("user_id", ASCENDING)], name="idx_mfa_user_id")
+            handle_index_conflict(db.mfa, [("status", ASCENDING)], name="idx_mfa_status")
         
-        # Get format from original if not specified
-        if not format:
-            format = img.format if img.format else 'JPEG'
+        # Password reset indexes
+        if 'password_reset_tokens' not in db.list_collection_names():
+            logger.warning("password_reset_tokens collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for password_reset_tokens collection...")
+            handle_index_conflict(db.password_reset_tokens, [("token", ASCENDING)], unique=True, name="idx_pwd_reset_token")
+            handle_index_conflict(db.password_reset_tokens, [("user_id", ASCENDING)], name="idx_pwd_reset_user_id")
+            handle_index_conflict(db.password_reset_tokens, [("expires_at", ASCENDING)], name="idx_pwd_reset_expires_at")
+            handle_index_conflict(db.password_reset_tokens, [("used", ASCENDING)], name="idx_pwd_reset_used")
         
-        # Save with specified format and quality
-        img.save(output, format=format, quality=quality)
-        
-        # Reset the file pointer to the beginning
-        output.seek(0)
-        
-        return output
+        logger.info("Authentication indexes created successfully")
         
     except Exception as e:
-        logger.error(f"Image resizing failed: {str(e)}")
-        raise ValidationError(f"Image resizing failed: {str(e)}")
+        logger.error(f"Error setting up authentication indexes: {str(e)}")
+        # Don't raise - allow app to continue with other indexes
 
-def create_thumbnail(input_path, output_path=None, size=(300, 300), quality=85):
+def setup_permission_indexes(db):
     """
-    Generate thumbnail version for an image.
+    Set up indexes for permission-related collections.
+    Added validation to check collection existence.
     
     Args:
-        input_path (str): Path to source image
-        output_path (str, optional): Path to save thumbnail. Defaults to None (auto-generated).
-        size (tuple, optional): Thumbnail size. Defaults to (300, 300).
-        quality (int, optional): JPEG quality (1-100). Defaults to 85.
-        
-    Returns:
-        str: Path to generated thumbnail
-        
-    Raises:
-        ValidationError: If thumbnail creation fails
+        db: MongoDB database instance
     """
     try:
-        # Generate output path if not provided
-        if not output_path:
-            if '.' in input_path:
-                base_path = input_path.rsplit('.', 1)[0]
-                ext = input_path.rsplit('.', 1)[1]
-                output_path = f"{base_path}_thumb.{ext}"
-            else:
-                output_path = f"{input_path}_thumb"
+        # Role indexes
+        if 'business_roles' not in db.list_collection_names():
+            logger.warning("business_roles collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for business_roles collection...")
+            handle_index_conflict(db.business_roles, [("role_name", ASCENDING)], unique=True, name="idx_roles_name")
         
-        # Create parent directory if needed
-        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+        # Role assignment indexes
+        if 'role_assignments' not in db.list_collection_names():
+            logger.warning("role_assignments collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for role_assignments collection...")
+            handle_index_conflict(
+                db.role_assignments, 
+                [("user_id", ASCENDING), ("context.business_id", ASCENDING)], 
+                unique=True, 
+                name="idx_role_assign_user_business"
+            )
+            handle_index_conflict(db.role_assignments, [("role_id", ASCENDING)], name="idx_role_assign_role_id")
+            handle_index_conflict(db.role_assignments, [("context.business_id", ASCENDING)], name="idx_role_assign_business_id")
+            handle_index_conflict(db.role_assignments, [("context.venue_id", ASCENDING)], name="idx_role_assign_venue_id")
+            handle_index_conflict(db.role_assignments, [("context.work_area_id", ASCENDING)], name="idx_role_assign_workarea_id")
+            handle_index_conflict(db.role_assignments, [("status", ASCENDING)], name="idx_role_assign_status")
         
-        # Open and resize the image
-        with Image.open(input_path) as img:
-            # Convert to RGB if RGBA to avoid issues with JPEG
-            if img.mode == 'RGBA' and output_path.lower().endswith(('jpg', 'jpeg')):
-                img = img.convert('RGB')
-                
-            # Resize the image while preserving aspect ratio
-            img.thumbnail(size, Image.LANCZOS)
-            
-            # Save the thumbnail
-            img.save(output_path, quality=quality)
+        # Permission cache indexes
+        if 'permission_cache' not in db.list_collection_names():
+            logger.warning("permission_cache collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for permission_cache collection...")
+            handle_index_conflict(
+                db.permission_cache, 
+                [("user_id", ASCENDING), ("permission", ASCENDING), ("context_hash", ASCENDING)],
+                unique=True,
+                name="idx_perm_cache_user_perm_ctx"
+            )
+            handle_index_conflict(db.permission_cache, [("expires_at", ASCENDING)], name="idx_perm_cache_expires_at")
         
-        return output_path
+        logger.info("Permission indexes created successfully")
         
     except Exception as e:
-        logger.error(f"Thumbnail creation failed: {str(e)}")
-        raise ValidationError(f"Thumbnail creation failed: {str(e)}")
+        logger.error(f"Error setting up permission indexes: {str(e)}")
+        # Don't raise - allow app to continue with other indexes
+
+def setup_business_indexes(db):
+    """
+    Set up indexes for business-related collections.
+    Added validation to check collection existence.
+    
+    Args:
+        db: MongoDB database instance
+    """
+    try:
+        # Business entities indexes
+        if 'business_entities' not in db.list_collection_names():
+            logger.warning("business_entities collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for business_entities collection...")
+            handle_index_conflict(db.business_entities, [("company_id", ASCENDING)], unique=True, name="idx_business_company_id")
+            handle_index_conflict(db.business_entities, [("company_name", TEXT)], name="idx_business_company_name_text")
+            handle_index_conflict(db.business_entities, [("venues.venue_id", ASCENDING)], name="idx_business_venue_id")
+        
+        # Business venues indexes
+        if 'business_venues' not in db.list_collection_names():
+            logger.warning("business_venues collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for business_venues collection...")
+            handle_index_conflict(db.business_venues, [("venue_id", ASCENDING)], unique=True, name="idx_venues_venue_id")
+            handle_index_conflict(db.business_venues, [("company_id", ASCENDING)], name="idx_venues_company_id")
+            handle_index_conflict(db.business_venues, [("venue_name", TEXT)], name="idx_venues_name_text")
+            handle_index_conflict(db.business_venues, [("workareas.work_area_id", ASCENDING)], name="idx_venues_workarea_id")
+        
+        # Business users indexes (additional indexes)
+        if 'business_users' not in db.list_collection_names():
+            logger.warning("business_users collection does not exist, skipping indexes")
+        elif db.business_users.count_documents({}) > 0:
+            logger.info("Setting up additional indexes for business_users collection...")
+            handle_index_conflict(db.business_users, [("work_email", TEXT)], name="idx_users_work_email_text")
+            handle_index_conflict(
+                db.business_users, 
+                [("first_name", TEXT), ("last_name", TEXT), ("preferred_name", TEXT)],
+                name="idx_users_name_text"
+            )
+        else:
+            logger.warning("business_users collection is empty, skipping additional indexes")
+        
+        logger.info("Business indexes created successfully")
+        
+    except Exception as e:
+        logger.error(f"Error setting up business indexes: {str(e)}")
+        # Don't raise - allow app to continue with other indexes
+
+def setup_audit_indexes(db):
+    """
+    Set up indexes for audit logging.
+    Added validation to check collection existence.
+    
+    Args:
+        db: MongoDB database instance
+    """
+    try:
+        # Audit log indexes
+        if 'audit_logs' not in db.list_collection_names():
+            logger.warning("audit_logs collection does not exist, skipping indexes")
+        else:
+            logger.info("Setting up indexes for audit_logs collection...")
+            handle_index_conflict(db.audit_logs, [("event_type", ASCENDING)], name="idx_audit_event_type")
+            handle_index_conflict(db.audit_logs, [("user_id", ASCENDING)], name="idx_audit_user_id")
+            handle_index_conflict(db.audit_logs, [("business_id", ASCENDING)], name="idx_audit_business_id")
+            handle_index_conflict(db.audit_logs, [("timestamp", DESCENDING)], name="idx_audit_timestamp")
+            handle_index_conflict(db.audit_logs, [("ip_address", ASCENDING)], name="idx_audit_ip_address")
+        
+        logger.info("Audit indexes created successfully")
+        
+    except Exception as e:
+        logger.error(f"Error setting up audit indexes: {str(e)}")
+        # Don't raise - allow app to continue with other indexes
+
+def setup_all_indexes(db):
+    """
+    Set up all indexes for the application.
+    
+    Args:
+        db: MongoDB database instance
+    """
+    try:
+        setup_authentication_indexes(db)
+        setup_permission_indexes(db)
+        setup_business_indexes(db)
+        setup_audit_indexes(db)
+        
+        logger.info("All indexes created successfully")
+        
+    except Exception as e:
+        logger.error(f"Error setting up indexes: {str(e)}")
+        # Don't raise - allow app to continue even if indexing fails
+
+def init_indexes(app):
+    """
+    Initialize MongoDB indexes with the application context.
+    
+    Args:
+        app: Flask application instance
+    """
+    try:
+        with app.app_context():
+            db = app.mongo.db
+            setup_all_indexes(db)
+            
+    except Exception as e:
+        logger.error(f"Error initializing indexes: {str(e)}")
+        # Don't raise the exception to allow the application to continue starting
