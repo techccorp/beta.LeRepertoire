@@ -331,14 +331,14 @@ from .api_utils import (
 
 # ---------------------------------------#
 #         Configuration Utilities        #
-# ---------------------------------------#    
-# from .config_utils import (
-#    load_config,
-#    save_config,
-#    validate_config,
-#    get_config_value,
-#    set_config_value
-# )
+# ---------------------------------------#     
+from .config_utils import (
+    load_config,
+    save_config,
+    validate_config,
+    get_config_value,
+    set_config_value
+ )
 
 # ---------------------------------------#
 #         Miscellaneous Utilities        #
