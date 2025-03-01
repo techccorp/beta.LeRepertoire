@@ -299,13 +299,13 @@ from .redis_utils import (
 # ---------------------------------------#
 #         Analytics Utilities            #
 # ---------------------------------------#    
-#from .analytics_utils import (
-#    track_event,
-#    log_user_activity,
-#    generate_report,
-#    get_user_engagement_data,
-#    analyze_trends
-#)
+from .analytics_utils import (
+    track_event,
+    log_user_activity,
+    generate_report,
+    get_user_engagement_data,
+    analyze_trends
+)
 
 # ---------------------------------------#
 #         Payment Processing Utilities   #
