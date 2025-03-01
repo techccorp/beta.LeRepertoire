@@ -2,7 +2,7 @@
 #         models/__init__.py            #
 # --------------------------------------#
 from .users_models import BusinessUser
-from flask import current_app
+from flask import current_app, g
 
 def get_db(app=None):
     """
@@ -34,6 +34,26 @@ def get_search_db(app=None):
         MongoDB database instance.
     """
     return get_db(app)
+
+def register_teardown(app):
+    """
+    Register database teardown handlers with Flask app.
+    
+    Args:
+        app: Flask application instance
+    """
+    @app.teardown_appcontext
+    def close_mongo_connection(exception=None):
+        """Close any open MongoDB connections at the end of the request."""
+        mongo_client = g.pop('mongo_client', None)
+        if mongo_client:
+            mongo_client.close()
+            
+    # Log registration of teardown handler
+    if app.logger:
+        app.logger.info("Registered MongoDB connection teardown handler")
+    
+    return app
 
 # ---------------------------------------------------------------#
 #  Legacy helper functions for user operations (backward compatible)
@@ -83,6 +103,7 @@ __all__ = [
     'BusinessUser',
     'get_db',
     'get_search_db',
+    'register_teardown',
     'find_user_in_business',
     'assign_role_to_user',
     'update_user_override'
