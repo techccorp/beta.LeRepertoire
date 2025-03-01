@@ -45,6 +45,7 @@ oauthlib
 openai
 outcome
 packaging
+Pillow
 pluggy
 propcache
 proto-plus
