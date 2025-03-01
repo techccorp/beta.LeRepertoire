@@ -310,13 +310,13 @@ from .analytics_utils import (
 # ---------------------------------------#
 #         Payment Processing Utilities   #
 # ---------------------------------------#    
-# from .payment_utils import (
-#    process_payment,
-#    refund_payment,
-#    validate_payment_info,
-#    get_payment_status,
-#    create_payment_intent
-# )
+from .payment_utils import (
+    process_payment,
+    refund_payment,
+    validate_payment_info,
+    get_payment_status,
+    create_payment_intent
+ )
 
 # ---------------------------------------#
 #         API Integration Utilities      #
@@ -425,8 +425,10 @@ __all__ = [
     'generate_session_id',
     'sanitize_input',
     'log_security_event',
+
     # Rate Limiting
     'RateLimiter',
+
     # Validation
     'validate_request_data',
     'validate_id_format',
@@ -574,11 +576,11 @@ __all__ = [
     'create_payment_intent',
     
     # API Integration
-    'call_external_api',
-    'handle_api_response',
-    'authenticate_api_request',
-    'log_api_usage',
-    'validate_api_key',
+   # 'call_external_api',
+   # 'handle_api_response',
+   # 'authenticate_api_request',
+   # 'log_api_usage',
+   # 'validate_api_key',
     
     # Configuration
     'load_config',
