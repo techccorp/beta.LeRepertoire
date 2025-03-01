@@ -69,66 +69,66 @@ class ModuleManager:
             raise RuntimeError(f"Module initialization failed: {str(e)}")
 
     def _init_auth_module(self, app: Flask) -> None:
-    """
-    Initialize authentication module components.
-    
-    Args:
-        app: Flask application instance
-    """
-    try:
-        # Get database reference - Fixed to properly access MongoDB client
-        db = None
-        if 'MONGO_CLIENT' in app.config:
-            try:
-                # Try to access using client[db_name] indexing
-                db = app.config['MONGO_CLIENT'][Config.MONGO_DBNAME]
-            except (TypeError, KeyError):
-                # Fallback to original approach if the above fails
-                pass
-                
-        # If still no db, try the app.mongo.db approach
-        if not db:
-            db = app.mongo.db if hasattr(app, 'mongo') and hasattr(app.mongo, 'db') else None
-            
-        if not db:
-            logger.error("Failed to get database reference for auth module")
-            raise ValueError("Database reference not available")
-
-        # First check if the classes are available
-        if 'BusinessContextValidator' not in globals() or 'PermissionManager' not in globals():
-            # Try to import again to handle potential circular imports
-            try:
-                from .auth import BusinessContextValidator, PermissionManager
-            except ImportError as e:
-                logger.error(f"Failed to import auth components: {str(e)}")
-                raise
-                
-        # Initialize business validator (which includes work_area_id validation)
-        business_validator = BusinessContextValidator(db)
-        self._services['business_validator'] = business_validator
-
-        # Initialize permission manager
-        permission_manager = PermissionManager(db)
-        self._services['permission_manager'] = permission_manager
-
-        # Set up database indexes with error handling
+        """
+        Initialize authentication module components.
+        
+        Args:
+            app: Flask application instance
+        """
         try:
-            with app.app_context():
-                BusinessContextValidator.setup_db_indexes(db)
-        except OperationFailure as e:
-            # Log the error but continue initialization
-            logger.warning(f"Error setting up indexes: {str(e)}")
-            logger.info("Continuing initialization without complete index setup")
-        except Exception as e:
-            logger.error(f"Unexpected error setting up indexes: {str(e)}")
-            # Continue initialization despite index errors
+            # Get database reference
+            db = None
+            if 'MONGO_CLIENT' in app.config:
+                try:
+                    # Try to access using client[db_name] indexing
+                    db = app.config['MONGO_CLIENT'][Config.MONGO_DBNAME]
+                except (TypeError, KeyError):
+                    # Fallback to original approach if the above fails
+                    pass
+                    
+            # If still no db, try the app.mongo.db approach
+            if not db:
+                db = app.mongo.db if hasattr(app, 'mongo') and hasattr(app.mongo, 'db') else None
                 
-        logger.info("Auth module initialized successfully")
+            if not db:
+                logger.error("Failed to get database reference for auth module")
+                raise ValueError("Database reference not available")
 
-    except Exception as e:
-        logger.error(f"Failed to initialize auth module: {str(e)}")
-        logger.debug(f"Auth module initialization error details: {traceback.format_exc()}")
-        raise
+            # First check if the classes are available
+            if 'BusinessContextValidator' not in globals() or 'PermissionManager' not in globals():
+                # Try to import again to handle potential circular imports
+                try:
+                    from .auth import BusinessContextValidator, PermissionManager
+                except ImportError as e:
+                    logger.error(f"Failed to import auth components: {str(e)}")
+                    raise
+                    
+            # Initialize business validator (which includes work_area_id validation)
+            business_validator = BusinessContextValidator(db)
+            self._services['business_validator'] = business_validator
+
+            # Initialize permission manager
+            permission_manager = PermissionManager(db)
+            self._services['permission_manager'] = permission_manager
+
+            # Set up database indexes with error handling
+            try:
+                with app.app_context():
+                    BusinessContextValidator.setup_db_indexes(db)
+            except OperationFailure as e:
+                # Log the error but continue initialization
+                logger.warning(f"Error setting up indexes: {str(e)}")
+                logger.info("Continuing initialization without complete index setup")
+            except Exception as e:
+                logger.error(f"Unexpected error setting up indexes: {str(e)}")
+                # Continue initialization despite index errors
+                    
+            logger.info("Auth module initialized successfully")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize auth module: {str(e)}")
+            logger.debug(f"Auth module initialization error details: {traceback.format_exc()}")
+            raise
 
     def get_service(self, service_name: str) -> Optional[Any]:
         """
