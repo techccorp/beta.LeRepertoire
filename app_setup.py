@@ -14,6 +14,7 @@ import redis
 
 # Import configuration modules - Updated to use the standardized import approach
 from config import Config, GoogleOAuthConfig, GoogleOAuthConfigError
+from redis_config import RedisConfig, RedisConfigError
 
 # Import database modules
 from db.indexes_setup import setup_all_indexes
@@ -88,26 +89,64 @@ def setup_database(app):
         raise
 
 def setup_redis(app):
-    """Set up Redis connection if configured."""
+    """Set up Redis connection using RedisConfig."""
     try:
-        redis_url = app.config.get('REDIS_URL')
-        if not redis_url:
-            logger.info("Redis not configured, skipping setup")
-            return None
+        # Validate Redis configuration
+        try:
+            RedisConfig.validate_config()
             
-        # Create Redis client
-        redis_client = redis.from_url(redis_url)
-        
-        # Test connection
-        redis_client.ping()
-        
-        # Store client in app
-        app.redis = redis_client
-        
-        logger.info(f"Connected to Redis: {redis_url}")
-        
-        return redis_client
-        
+            # Store Redis configuration in app config
+            app.config['REDIS_HOST'] = RedisConfig.REDIS_HOST
+            app.config['REDIS_PORT'] = RedisConfig.REDIS_PORT
+            app.config['REDIS_USERNAME'] = RedisConfig.REDIS_USERNAME
+            app.config['REDIS_PASSWORD'] = RedisConfig.REDIS_PASSWORD
+            app.config['REDIS_DB'] = RedisConfig.REDIS_DB
+            app.config['REDIS_DECODE_RESPONSES'] = RedisConfig.REDIS_DECODE_RESPONSES
+            app.config['REDIS_URL'] = RedisConfig.get_redis_url()
+            app.config['REDIS_KEY_PREFIX'] = RedisConfig.REDIS_KEY_PREFIX
+            app.config['REDIS_DEFAULT_EXPIRY'] = RedisConfig.REDIS_DEFAULT_EXPIRY
+            
+            # Create Redis client with dedicated configuration
+            redis_client = redis.Redis(
+                host=RedisConfig.REDIS_HOST,
+                port=RedisConfig.REDIS_PORT,
+                username=RedisConfig.REDIS_USERNAME,
+                password=RedisConfig.REDIS_PASSWORD,
+                db=RedisConfig.REDIS_DB,
+                decode_responses=RedisConfig.REDIS_DECODE_RESPONSES,
+                socket_timeout=RedisConfig.REDIS_SOCKET_TIMEOUT,
+                socket_connect_timeout=RedisConfig.REDIS_SOCKET_CONNECT_TIMEOUT
+            )
+            
+            # Test connection
+            redis_client.ping()
+            
+            # Store client in app
+            app.redis = redis_client
+            
+            # Test basic operations
+            test_key = f"{RedisConfig.REDIS_KEY_PREFIX}app_test_key"
+            redis_client.setex(test_key, 60, "app_test_value")
+            test_result = redis_client.get(test_key)
+            if test_result != "app_test_value":
+                logger.warning(f"Redis data integrity check failed: {test_result}")
+            
+            logger.info(f"Connected to Redis: {RedisConfig.REDIS_HOST}:{RedisConfig.REDIS_PORT}")
+            
+            return redis_client
+            
+        except RedisConfigError as e:
+            # In development mode, we'll continue without Redis
+            if app.config.get('DEBUG', False):
+                logger.warning(f"Redis not configured properly: {str(e)}")
+                logger.warning("Redis features will not be available")
+                return None
+            else:
+                # In production, log the error but continue
+                logger.error(f"Redis configuration error: {str(e)}")
+                logger.warning("Continuing without Redis support")
+                return None
+                
     except Exception as e:
         logger.warning(f"Error connecting to Redis: {str(e)}")
         logger.warning("Continuing without Redis cache support")
@@ -330,10 +369,13 @@ def cleanup_resources(app):
     """Register cleanup handlers for application resources."""
     try:
         @app.teardown_appcontext
-        def close_db_connection(exception=None):
-            """Close MongoDB connection on request end."""
+        def close_connections(exception=None):
+            """Close database connections on request end."""
+            # Close MongoDB connection
             if hasattr(app, 'mongo') and hasattr(app.mongo, 'client'):
                 app.mongo.client.close()
+                
+            # No need to explicitly close Redis connection as the client handles this
         
         logger.info("Resource cleanup handlers registered")
         
