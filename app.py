@@ -264,8 +264,7 @@ from utils import (
 
 # Import configuration and services
 from config import Config, GoogleOAuthConfig, GoogleOAuthConfigError
-from services import get_service
-from id_service import IDService
+from services import IDService, get_service  # Changed to import IDService directly from services
 
 # Updated models import with register_teardown
 from models import get_db as models_get_db, get_search_db, register_teardown
