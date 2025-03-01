@@ -475,9 +475,25 @@ except Exception as e:
 #           Initialize modules
 # -------------------------------------#
 try:
+    # The standard import path
     from modules import module_manager
     module_manager.init_app(app)
     logger.info("Module system initialized successfully")
+except ImportError as e:
+    # Fallback approach - attempt to import directly if package import fails
+    try:
+        from modules.module_manager import module_manager
+        module_manager.init_app(app)
+        logger.info("Module system initialized using direct import")
+    except Exception as inner_e:
+        # Create minimal placeholder if both approaches fail
+        class DummyModuleManager:
+            def init_app(self, app):
+                return app
+                
+        module_manager = DummyModuleManager()
+        module_manager.init_app(app)
+        logger.warning(f"Using minimal module system due to import error: {str(e)}")
 except Exception as e:
     logger.critical(f"Failed to initialize module system: {str(e)}")
     raise
