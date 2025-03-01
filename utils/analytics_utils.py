@@ -319,41 +319,34 @@ def analyze_trends(event_type=None, time_period='daily', start_date=None, end_da
                 'unique_users': {'$addToSet': '$user_id'}
             }},
             {'$project': {
-                'date_key': {
-                    '$dateToString': {
-                        'format': date_format,
-                        'date': '$timestamp'
-                    } if 'timestamp' in '$_id' else {
-                        # Handle different time period formats
-                        '$concat': [
-                            '$_id.year',
-                            time_period == 'monthly' ? '-' : '-W',
-                            time_period == 'monthly' ? '$_id.month' : '$_id.week'
-                        ] if time_period in ['weekly', 'monthly'] else {
-                            '$concat': [
-                                '$_id.year', '-', '$_id.month', '-', '$_id.day',
-                                time_period == 'hourly' ? ' ' : '',
-                                time_period == 'hourly' ? '$_id.hour' : '',
-                                time_period == 'hourly' ? ':00' : ''
-                            ]
-                        }
-                    }
-                },
+                'date_parts': '$_id',
                 'event_type': '$_id.event_type',
                 'count': 1,
                 'unique_user_count': {'$size': '$unique_users'}
             }},
-            {'$sort': {'date_key': 1, 'event_type': 1}}
+            {'$sort': {'date_parts.year': 1, 'date_parts.month': 1, 'event_type': 1}}
         ]
         
         # Execute aggregation
         trend_data = list(analytics_db.aggregate(pipeline))
         
-        # Format results
+        # Format results - handle date formatting in Python
         formatted_data = []
         for item in trend_data:
+            date_parts = item['date_parts']
+            
+            # Format date string based on time period
+            if time_period == 'hourly':
+                date_str = f"{date_parts['year']}-{date_parts['month']}-{date_parts['day']} {date_parts.get('hour', '00')}:00"
+            elif time_period == 'weekly':
+                date_str = f"{date_parts['year']}-W{date_parts.get('week', '01')}"
+            elif time_period == 'monthly':
+                date_str = f"{date_parts['year']}-{date_parts['month']}"
+            else:  # daily is default
+                date_str = f"{date_parts['year']}-{date_parts['month']}-{date_parts['day']}"
+            
             formatted_data.append({
-                'date': item['date_key'],
+                'date': date_str,
                 'event_type': item['event_type'],
                 'count': item['count'],
                 'unique_users': item['unique_user_count']
