@@ -321,13 +321,13 @@ from .payment_utils import (
 # ---------------------------------------#
 #         API Integration Utilities      #
 # ---------------------------------------#    
-# from .api_utils import (
-#    call_external_api,
-#    handle_api_response,
-#    authenticate_api_request,
-#    log_api_usage,
-#    validate_api_key
-# )
+from .api_utils import (
+   call_external_api,
+   handle_api_response,
+   authenticate_api_request,
+   log_api_usage,
+   validate_api_key
+)
 
 # ---------------------------------------#
 #         Configuration Utilities        #
@@ -576,11 +576,11 @@ __all__ = [
     'create_payment_intent',
     
     # API Integration
-   # 'call_external_api',
-   # 'handle_api_response',
-   # 'authenticate_api_request',
-   # 'log_api_usage',
-   # 'validate_api_key',
+    'call_external_api',
+    'handle_api_response',
+    'authenticate_api_request',
+    'log_api_usage',
+    'validate_api_key',
     
     # Configuration
     'load_config',
