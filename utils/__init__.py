@@ -556,6 +556,8 @@ __all__ = [
     'delete_cache',
     'clear_cache',
     'cache_key_generator',
+    'get_hash',
+    'set_hash',
     
     # Analytics
     'track_event',
