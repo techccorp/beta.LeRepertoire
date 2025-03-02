@@ -1,0 +1,29 @@
+python -m venv venv
+.\venv\Scripts\Activate
+pip install aiohttp --prefer-binary
+python.exe -m pip install --upgrade pip
+pip install -r requirements.txt
+pip install --upgrade pip setuptools wheel
+pip install --upgrade Flask-WTF WTForms
+pip install --upgrade Flask-WTF
+pip install --upgrade Flask Werkzeug
+npm install tailwindcss postcss autoprefixer
+npx tailwindcss init
+npx tailwindcss -i ./static/css/style.css -o ./static/css/output.css --watch
+python app.py
+
+
+
+python3 -m venv venv
+source venv/bin/activate
+pip install aiohttp --prefer-binary
+pip install -r requirements.txt
+pip install --upgrade pip
+pip install --upgrade pip setuptools wheel
+pip install --upgrade Flask-WTF WTForms
+pip install --upgrade Flask-WTF
+pip install --upgrade Flask Werkzeug
+npm install tailwindcss postcss autoprefixer
+npx tailwindcss init
+npx tailwindcss -i ./static/css/style.css -o ./static/css/output.css --watch
+python app.py
